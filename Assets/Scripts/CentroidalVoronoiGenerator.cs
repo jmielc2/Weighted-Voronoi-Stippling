@@ -2,7 +2,7 @@ using UnityEngine;
 using Unity.Collections;
 
 [RequireComponent(typeof(Camera))]
-public class VoronoiGenerator : MonoBehaviour {
+public class CentroidalVoronoiGenerator : MonoBehaviour {
     [SerializeField]
     Material material;
     [SerializeField, Range(1, 1023)]
@@ -111,7 +111,7 @@ public class VoronoiGenerator : MonoBehaviour {
             Rect regionToReadFrom = new Rect(0, 0, Screen.width, Screen.height);
             voronoiTexture.ReadPixels(regionToReadFrom, 0, 0, false);
             voronoiTexture.Apply();
-            System.IO.File.WriteAllBytes("./Documents/voronoi.png", voronoiTexture.EncodeToPNG());
+            System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", voronoiTexture.EncodeToPNG());
             saveImage = false;
         }
     }
