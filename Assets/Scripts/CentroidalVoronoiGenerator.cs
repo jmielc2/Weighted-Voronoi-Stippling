@@ -3,22 +3,40 @@ using Unity.Collections;
 
 [RequireComponent(typeof(Camera))]
 public class CentroidalVoronoiGenerator : MonoBehaviour {
+    // Control Parameters
     [SerializeField]
     Material material;
+    [SerializeField]
+    Material pointMaterial;
     [SerializeField, Range(1, 1023)]
     int numPoints;
+    [SerializeField]
+    Mesh pointMesh;
+    [SerializeField]
+    bool showPoints = true;
+    [SerializeField]
+    Material centroidMaterial;
+    [SerializeField]
+    bool showCentroids = true;
 
+    // Private Member Variables
     Mesh coneMesh;
     RenderParams renderParams;
     ComputeBuffer colorBuffer;
     NativeArray<Vector3> colors;
-    Matrix4x4[] matrices;
+    Matrix4x4[] coneMatrices;
+    Matrix4x4[] pointMatrices;
+    Matrix4x4[] centroidMatrices;
     Camera cam;
     Texture2D voronoiTexture;
     bool saveImage = false;
+    bool calcCentroid = false;
 
+    // Constant and Static Member Variables
+    const float pointScale = 0.025f;
     readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer");
 
+    // Runs when parameter is changed in editor during play
     void OnValidate() {
         if (colorBuffer != null) {
             OnDisable();
@@ -26,38 +44,71 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         }
     }
 
+    // Runs when element is enabled
     void OnEnable() {
         cam = GetComponent<Camera>();
         GeneratePoints();
         GenerateConeMesh();
         material.SetBuffer(colorBufferId, colorBuffer);
-        renderParams = new RenderParams(material);
+        renderParams = new RenderParams();
         renderParams.worldBounds = new Bounds(Vector3.zero, Vector3.one * 7f);
         voronoiTexture = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
         Camera.onPostRender += OnPostRenderCallback;
     }
 
+    // Runs when element is disabled
     void OnDisable() {
         colors.Dispose();
         colorBuffer.Release();
         colorBuffer = null;
     }
 
+    // Calculates the centroid positions for each voronoi section
+    void CalculateCentroids() {
+        // TODO: Figure out how to access partially rendered frame
+        Vector2[] centroidPositions = new Vector2[numPoints];
+        int[] counts = new int[numPoints];
+        for (int y = 0; y < cam.pixelHeight; y++) {
+            for (int x = 0; x < cam.pixelWidth; x++) {
+                Color color = voronoiTexture.GetPixel(x, y);
+                int index = (int)(color.b * numPoints);
+                centroidPositions[index] += new Vector2(
+                    (float)x / (float)cam.pixelWidth,
+                    (float)y / (float)cam.pixelHeight
+                );
+                counts[index]++;
+            }
+        }
+        foreach(int a in counts) {
+            Debug.Log(a);
+        }
+    }
+
     void GeneratePoints() {
         colorBuffer = new ComputeBuffer(numPoints, sizeof(float) * 3);
         colors = new NativeArray<Vector3>(numPoints, Allocator.Persistent);
-        matrices = new Matrix4x4[numPoints];
+        coneMatrices = new Matrix4x4[numPoints];
+        pointMatrices = new Matrix4x4[numPoints];
+        centroidMatrices = new Matrix4x4[numPoints];
         Vector3 position = Vector3.zero;
+        Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
         for (int i = 0; i < numPoints; i++) {
+            // Calculate Cone Matrix
             position.x = Random.Range(-1f, 1f) * cam.aspect;
             position.y = Random.Range(-1f, 1f);
-            matrices[i] = Matrix4x4.Translate(position);
+            position.z = 0f;
+            coneMatrices[i] = Matrix4x4.Translate(position);
+            // Calculate Point Matrix
+            position.z = pointScale * 0.5f;
+            pointMatrices[i] = Matrix4x4.TRS(position, pointRotation, Vector3.one * pointScale);
+            // Assign Unique Color (will be used when calculating centroid)
             colors[i] = new Vector3(
                 Random.Range(0f, 1f),
                 Random.Range(0f, 1f),
                 (float)i / (float)numPoints
             );
         }
+        pointMatrices.CopyTo(centroidMatrices, 0);
         colorBuffer.SetData(colors);
     }
 
@@ -96,23 +147,45 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     }
 
     void GenerateVoronoi() {
-        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, matrices);
+        // Render Cones
+        renderParams.material = material;
+        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices);
+        if (calcCentroid) {
+            CalculateCentroids();
+            calcCentroid = false;
+        }
+
+        // Render OG Points
+        if (showPoints) {
+            renderParams.material = pointMaterial;
+            Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, pointMatrices);
+        }
+
+        if (showCentroids) {
+            renderParams.material = centroidMaterial;
+            Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, centroidMatrices);
+        }
     }
 
     void Update() {
         if (Input.GetKeyDown(KeyCode.Space)) {
             saveImage = true;
         }
+        if (Input.GetKeyDown(KeyCode.S)) {
+            calcCentroid = true;
+        }
         GenerateVoronoi();
     }
 
     void OnPostRenderCallback(Camera renderCam) {
-        if (saveImage) {
+        if (voronoiTexture) {
             Rect regionToReadFrom = new Rect(0, 0, Screen.width, Screen.height);
             voronoiTexture.ReadPixels(regionToReadFrom, 0, 0, false);
             voronoiTexture.Apply();
-            System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", voronoiTexture.EncodeToPNG());
-            saveImage = false;
+            if (saveImage) {
+                System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", voronoiTexture.EncodeToPNG());
+                saveImage = false;
+            }
         }
     }
 }

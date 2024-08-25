@@ -219,7 +219,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: a8498d19675304f3abb8be502ed6bc94, type: 2}
+  pointMaterial: {fileID: 2100000, guid: 8d162303c0a414b94ba7adc9199e1a81, type: 2}
+  pointMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   numPoints: 100
+  showPoints: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

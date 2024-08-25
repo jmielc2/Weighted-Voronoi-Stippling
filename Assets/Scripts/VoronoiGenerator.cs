@@ -3,22 +3,34 @@ using Unity.Collections;
 
 [RequireComponent(typeof(Camera))]
 public class VoronoiGenerator : MonoBehaviour {
+    // Control Parameters
     [SerializeField]
     Material material;
+    [SerializeField]
+    Material pointMaterial;
+    [SerializeField]
+    Mesh pointMesh;
     [SerializeField, Range(1, 1023)]
     int numPoints;
+    [SerializeField]
+    bool showPoints = true;
 
+    // Private Member Variables
     Mesh coneMesh;
     RenderParams renderParams;
     ComputeBuffer colorBuffer;
     NativeArray<Vector3> colors;
-    Matrix4x4[] matrices;
+    Matrix4x4[] coneMatrices;
+    Matrix4x4[] pointMatrices;
     Camera cam;
     Texture2D voronoiTexture;
     bool saveImage = false;
 
+    // Constant and Statice Member Variables
+    const float pointScale = 0.025f;
     readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer");
 
+    // Runs when parameter is changed in editor during play
     void OnValidate() {
         if (colorBuffer != null) {
             OnDisable();
@@ -26,32 +38,43 @@ public class VoronoiGenerator : MonoBehaviour {
         }
     }
 
+    // Runs when element is enabled
     void OnEnable() {
         cam = GetComponent<Camera>();
         GeneratePoints();
         GenerateConeMesh();
         material.SetBuffer(colorBufferId, colorBuffer);
-        renderParams = new RenderParams(material);
+        renderParams = new RenderParams();
         renderParams.worldBounds = new Bounds(Vector3.zero, Vector3.one * 7f);
         voronoiTexture = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
         Camera.onPostRender += OnPostRenderCallback;
     }
 
+    // Runs when element is disabled
     void OnDisable() {
         colors.Dispose();
         colorBuffer.Release();
         colorBuffer = null;
     }
 
+    // Generates point used to create Voronoi Diagram
     void GeneratePoints() {
         colorBuffer = new ComputeBuffer(numPoints, sizeof(float) * 3);
         colors = new NativeArray<Vector3>(numPoints, Allocator.Persistent);
-        matrices = new Matrix4x4[numPoints];
+        coneMatrices = new Matrix4x4[numPoints];
+        pointMatrices = new Matrix4x4[numPoints];
         Vector3 position = Vector3.zero;
+        Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
         for (int i = 0; i < numPoints; i++) {
+            // Calculate Cone Matrix
             position.x = Random.Range(-1f, 1f) * cam.aspect;
             position.y = Random.Range(-1f, 1f);
-            matrices[i] = Matrix4x4.Translate(position);
+            position.z = 0f;
+            coneMatrices[i] = Matrix4x4.Translate(position);
+            // Calculate Point Matrix
+            position.z = pointScale * 0.5f;
+            pointMatrices[i] = Matrix4x4.TRS(position, pointRotation, Vector3.one * pointScale);
+            // Assign Unique Color
             colors[i] = new Vector3(
                 Random.Range(0f, 1f),
                 Random.Range(0f, 1f),
@@ -96,7 +119,13 @@ public class VoronoiGenerator : MonoBehaviour {
     }
 
     void GenerateVoronoi() {
-        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, matrices);
+        renderParams.material = material;
+        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices);
+        
+        if (showPoints) {
+            renderParams.material = pointMaterial;
+            Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, pointMatrices);
+        }
     }
 
     void Update() {
