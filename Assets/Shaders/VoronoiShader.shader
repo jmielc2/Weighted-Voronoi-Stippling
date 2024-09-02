@@ -1,8 +1,4 @@
-Shader "Unlit/Point Shader" {
-    Properties {
-        _Color ("Color", Color) = (0, 0, 0, 0)
-    }
-
+Shader "Custom/Voronoi Shader" {
     SubShader {
         Tags { "RenderType"="Opaque" }
 
@@ -24,21 +20,27 @@ Shader "Unlit/Point Shader" {
 
             struct v2f {
                 float4 vertex : SV_POSITION;
+                float3 color : TEXCOORD0;
             };
 
-            float4 _Color;
+            StructuredBuffer<float3> _ColorBuffer;
 
-            v2f vert (appdata v) {
+            v2f vert(appdata v) {
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
                 #endif
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
+                #if defined(INSTANCING_ON)
+                o.color = _ColorBuffer[v.instanceID];
+                #else
+                o.color = float3(0, 0, 0);
+                #endif
                 return o;
             }
 
-            float4 frag (v2f i) : SV_Target {
-                return _Color;
+            float4 frag(v2f i) : SV_Target {
+                return float4(i.color, 1);
             }
             ENDCG
         }

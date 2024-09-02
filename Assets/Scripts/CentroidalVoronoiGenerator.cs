@@ -8,7 +8,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Material material;
     [SerializeField]
     Material pointMaterial;
-    [SerializeField, Range(1, 1023)]
+    [SerializeField, Range(1, 2000)]
     int numPoints;
     [SerializeField]
     Mesh pointMesh;
@@ -36,6 +36,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
 
     // Constant and Static Member Variables
     const float pointScale = 0.025f;
+    const float centroidScale = 0.02f;
     readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer");
 
     // Runs when parameter is changed in editor during play
@@ -48,6 +49,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
 
     // Runs when element is enabled
     void OnEnable() {
+        calcCentroid = true;
         cam = GetComponent<Camera>();
         GeneratePoints();
         GenerateConeMesh();
@@ -58,8 +60,8 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         int diagramWidth = Screen.width / 4;
         int diagramHeight = Screen.height / 4;
         regionToReadFrom = new Rect(0, 0, diagramWidth, diagramHeight);
-        voronoiTexture = new Texture2D(diagramWidth, diagramHeight, TextureFormat.RGB24, false);
-        voronoiTextureTarget = new RenderTexture(diagramWidth, diagramHeight, 24, RenderTextureFormat.Default);
+        voronoiTexture = new Texture2D(diagramWidth, diagramHeight, TextureFormat.RGBAFloat, false);
+        voronoiTextureTarget = new RenderTexture(diagramWidth, diagramHeight, 32 * 4, RenderTextureFormat.ARGBFloat);
         voronoiTextureTarget.Create();
         Camera.onPostRender += OnPostRenderCallback;
     }
@@ -75,13 +77,14 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
 
     // Calculates the centroid positions for each voronoi section
     void CalculateCentroids() {
-        // TODO: Debug centroid calculation. Maybe there's a better way?
+        // TODO: There are errors when getting the index associated with a given pixel.
         Vector2[] centroidPositions = new Vector2[numPoints];
         int[] counts = new int[numPoints];
         for (int y = 0; y < voronoiTexture.height; y++) {
             for (int x = 0; x < voronoiTexture.width; x++) {
-                Color color = voronoiTexture.GetPixel(x, y);
-                int index = (int)(color.b * numPoints);
+                float colorB = voronoiTexture.GetPixel(x, y).b + 0.0003f;
+                int index = Mathf.FloorToInt(colorB * numPoints);
+                // Debug.Log($"{colorB} => {index}");
                 centroidPositions[index] += new Vector2(
                     (x + 0.5f) / (float)voronoiTexture.width,
                     (y + 0.5f) / (float)voronoiTexture.height
@@ -92,13 +95,23 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         for (int i = 0; i < numPoints; i++) {
             Vector3 centroid = Vector3.zero;
             float scalar = 2f / counts[i];
-            centroid.x = centroidPositions[i].x * scalar * cam.aspect;
-            centroid.y = centroidPositions[i].y * scalar;
-            centroid -= Vector3.one;
-            centroid.z = pointScale * 0.5f;
-            centroidMatrices[i] = Matrix4x4.TRS(centroid, Quaternion.identity, Vector3.one * pointScale);
+            centroid.x = (centroidPositions[i].x * scalar - 1f) * cam.aspect;
+            centroid.y = centroidPositions[i].y * scalar - 1f;
+            centroidPositions[i] = centroid;
+            centroid.z = centroidScale * 0.5f;
+            centroidMatrices[i] = Matrix4x4.TRS(centroid, Quaternion.identity, Vector3.one * centroidScale);
         }
         Debug.Log("Centroids generated.");
+        UpdatePoints(centroidPositions);
+    }
+
+    void UpdatePoints(Vector2[] centroidPositions) {
+        // TODO: Update points to move towards the centroid positions.
+        for(int i = 0; i < centroidPositions.Length; i++) {
+            Vector3 centroid = centroidPositions[i];
+            Vector3 point = coneMatrices[i].GetColumn(3);
+            
+        }
     }
 
     void GeneratePoints() {
@@ -122,7 +135,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
             colors[i] = new Vector3(
                 Random.Range(0f, 1f),
                 Random.Range(0f, 1f),
-                (float)i / (float)numPoints
+                i / (float)numPoints
             );
         }
 
