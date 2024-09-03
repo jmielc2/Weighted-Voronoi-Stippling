@@ -8,7 +8,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Material material;
     [SerializeField]
     Material pointMaterial;
-    [SerializeField, Range(1, 2000)]
+    [SerializeField, Range(1, 1024)]
     int numPoints;
     [SerializeField]
     Mesh pointMesh;
@@ -18,6 +18,8 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Material centroidMaterial;
     [SerializeField]
     bool showCentroids = true;
+    [SerializeField]
+    Camera voronoiCam;
 
     // Private Member Variables
     Mesh coneMesh;
@@ -32,7 +34,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Texture2D voronoiTexture;
     bool saveImage = false;
     bool calcCentroid = true;
-    Rect regionToReadFrom;
+    Rect screenRegionRect;
 
     // Constant and Static Member Variables
     const float pointScale = 0.025f;
@@ -59,11 +61,16 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         };
         int diagramWidth = Screen.width / 4;
         int diagramHeight = Screen.height / 4;
-        regionToReadFrom = new Rect(0, 0, diagramWidth, diagramHeight);
+        screenRegionRect = new Rect(0, 0, Screen.width, Screen.height);
+        RenderTextureDescriptor descriptor = new RenderTextureDescriptor(diagramWidth, diagramHeight, RenderTextureFormat.ARGBFloat, 32) {
+            sRGB = false
+        };
         voronoiTexture = new Texture2D(diagramWidth, diagramHeight, TextureFormat.RGBAFloat, false);
-        voronoiTextureTarget = new RenderTexture(diagramWidth, diagramHeight, 32 * 4, RenderTextureFormat.ARGBFloat);
+        // voronoiTextureTarget = new RenderTexture(diagramWidth, diagramHeight, 32 * 4, RenderTextureFormat.ARGBFloat);
+        voronoiTextureTarget = new RenderTexture(descriptor);
         voronoiTextureTarget.Create();
-        Camera.onPostRender += OnPostRenderCallback;
+        voronoiCam.CopyFrom(cam);
+        voronoiCam.targetTexture = voronoiTextureTarget;
     }
 
     // Runs when element is disabled
@@ -77,14 +84,15 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
 
     // Calculates the centroid positions for each voronoi section
     void CalculateCentroids() {
-        // TODO: There are errors when getting the index associated with a given pixel.
+        // TODO: Centroid calculation works, but could be improved in performance.
         Vector2[] centroidPositions = new Vector2[numPoints];
         int[] counts = new int[numPoints];
         for (int y = 0; y < voronoiTexture.height; y++) {
             for (int x = 0; x < voronoiTexture.width; x++) {
-                float colorB = voronoiTexture.GetPixel(x, y).b + 0.0003f;
+                float colorB = voronoiTexture.GetPixel(x, y).b + (0.5f / numPoints);
+                // float colorB = voronoiTexture.GetPixel(x, y).b;
+                // Debug.Log(voronoiTexture.GetPixel(x, y).b);
                 int index = Mathf.FloorToInt(colorB * numPoints);
-                // Debug.Log($"{colorB} => {index}");
                 centroidPositions[index] += new Vector2(
                     (x + 0.5f) / (float)voronoiTexture.width,
                     (y + 0.5f) / (float)voronoiTexture.height
@@ -94,12 +102,17 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         }
         for (int i = 0; i < numPoints; i++) {
             Vector3 centroid = Vector3.zero;
-            float scalar = 2f / counts[i];
-            centroid.x = (centroidPositions[i].x * scalar - 1f) * cam.aspect;
-            centroid.y = centroidPositions[i].y * scalar - 1f;
-            centroidPositions[i] = centroid;
-            centroid.z = centroidScale * 0.5f;
-            centroidMatrices[i] = Matrix4x4.TRS(centroid, Quaternion.identity, Vector3.one * centroidScale);
+            if (counts[i] == 0) {
+                centroidMatrices[i] = pointMatrices[i];
+                Debug.Log($"Index {i} has count of 0.");
+            } else {
+                float scalar = 2f / counts[i];
+                centroid.x = (centroidPositions[i].x * scalar - 1f) * cam.aspect;
+                centroid.y = centroidPositions[i].y * scalar - 1f;
+                centroidPositions[i] = centroid;
+                centroid.z = centroidScale * 0.5f;
+                centroidMatrices[i] = Matrix4x4.TRS(centroid, Quaternion.identity, Vector3.one * centroidScale);
+            }
         }
         Debug.Log("Centroids generated.");
         UpdatePoints(centroidPositions);
@@ -110,7 +123,6 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         for(int i = 0; i < centroidPositions.Length; i++) {
             Vector3 centroid = centroidPositions[i];
             Vector3 point = coneMatrices[i].GetColumn(3);
-            
         }
     }
 
@@ -182,23 +194,23 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
 
         // Render To Texture
         var currentRT = RenderTexture.active;
-        cam.targetTexture = RenderTexture.active = voronoiTextureTarget;
+        RenderTexture.active = voronoiTextureTarget;
         Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices);
-        cam.Render();
-        voronoiTexture.ReadPixels(regionToReadFrom, 0, 0);
+        voronoiCam.Render();
+        voronoiTexture.ReadPixels(screenRegionRect, 0, 0);
         voronoiTexture.Apply();
-        cam.targetTexture = RenderTexture.active = currentRT;
+        RenderTexture.active = currentRT;
 
         // Render To Screen
-        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices);
+        Graphics.DrawTexture(screenRegionRect, voronoiTexture);
     }
 
     void Update() {
         // Get User Input
-        if (Input.GetKeyDown(KeyCode.Space)) {
+        if (Input.GetKeyDown(KeyCode.S)) {
             saveImage = true;
         }
-        if (Input.GetKeyDown(KeyCode.S)) {
+        if (Input.GetKeyDown(KeyCode.C)) {
             calcCentroid = true;
         }
 
@@ -222,16 +234,17 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         }
     }
 
-    void OnPostRenderCallback(Camera renderCam) {
-        if (voronoiTexture) {
-            if (saveImage) {
-                // TODO: Debug screen shot errors.
-                Texture2D screenshot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-                screenshot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                screenshot.Apply();
-                System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", screenshot.EncodeToPNG());
-                saveImage = false;
-            }
+    private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+        if (saveImage) {
+            var currentRT = RenderTexture.active;
+            RenderTexture.active = source;
+            Texture2D screenshot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBAFloat, false);
+            screenshot.ReadPixels(screenRegionRect, 0, 0);
+            screenshot.Apply();
+            System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", screenshot.EncodeToPNG());
+            saveImage = false;
+            currentRT = RenderTexture.active;
         }
+        Graphics.Blit(source, destination);
     }
 }

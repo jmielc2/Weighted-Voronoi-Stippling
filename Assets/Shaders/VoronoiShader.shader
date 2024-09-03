@@ -20,27 +20,29 @@ Shader "Custom/Voronoi Shader" {
 
             struct v2f {
                 float4 vertex : SV_POSITION;
-                float3 color : TEXCOORD0;
+                #if defined(INSTANCING_ON)
+                uint instanceID : SV_InstanceID;
+                #endif
             };
 
             StructuredBuffer<float3> _ColorBuffer;
 
             v2f vert(appdata v) {
+                v2f o;
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_TRANSFER_INSTANCE_ID(v, o);
                 #endif
-                v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                #if defined(INSTANCING_ON)
-                o.color = _ColorBuffer[v.instanceID];
-                #else
-                o.color = float3(0, 0, 0);
-                #endif
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target {
-                return float4(i.color, 1);
+                #if defined(INSTANCING_ON)
+                return float4(_ColorBuffer[i.instanceID], 1);
+                #else
+                return float4(0.2, 0.2, 0.2, 1);
+                #endif
             }
             ENDCG
         }
