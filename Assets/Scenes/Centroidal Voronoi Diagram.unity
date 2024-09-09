@@ -221,11 +221,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: a8498d19675304f3abb8be502ed6bc94, type: 2}
   pointMaterial: {fileID: 2100000, guid: 8d162303c0a414b94ba7adc9199e1a81, type: 2}
-  numPoints: 100
+  numPoints: 2000
   pointMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  showPoints: 1
+  showPoints: 0
   centroidMaterial: {fileID: 2100000, guid: 09f54cdb1132d4c729078f538e69fc6a, type: 2}
-  showCentroids: 1
+  showCentroids: 0
   voronoiCam: {fileID: 1599442399}
 --- !u!1 &1599442397
 GameObject:

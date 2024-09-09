@@ -8,7 +8,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Material material;
     [SerializeField]
     Material pointMaterial;
-    [SerializeField, Range(1, 1024)]
+    [SerializeField, Range(1, 2000)]
     int numPoints;
     [SerializeField]
     Mesh pointMesh;
@@ -89,9 +89,10 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         int[] counts = new int[numPoints];
         for (int y = 0; y < voronoiTexture.height; y++) {
             for (int x = 0; x < voronoiTexture.width; x++) {
-                float colorB = voronoiTexture.GetPixel(x, y).b + (0.5f / numPoints);
-                // float colorB = voronoiTexture.GetPixel(x, y).b;
-                // Debug.Log(voronoiTexture.GetPixel(x, y).b);
+                // float colorB = voronoiTexture.GetPixel(x, y).b + (0.5f / numPoints);
+                float colorB = voronoiTexture.GetPixel(x, y).b;
+                Debug.Log($"CR: {colorB}");
+                colorB += (0.5f / numPoints);
                 int index = Mathf.FloorToInt(colorB * numPoints);
                 centroidPositions[index] += new Vector2(
                     (x + 0.5f) / (float)voronoiTexture.width,
@@ -144,10 +145,12 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
             position.z = pointScale * 0.5f;
             pointMatrices[i] = Matrix4x4.TRS(position, pointRotation, Vector3.one * pointScale);
             // Assign Unique Color (will be used when calculating centroid)
+            float colorB = i / (float)numPoints;
+            Debug.Log($"VC: {colorB}");
             colors[i] = new Vector3(
                 Random.Range(0f, 1f),
                 Random.Range(0f, 1f),
-                i / (float)numPoints
+                colorB
             );
         }
 
@@ -195,8 +198,14 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         // Render To Texture
         var currentRT = RenderTexture.active;
         RenderTexture.active = voronoiTextureTarget;
-        Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices);
-        voronoiCam.Render();
+        int start = 0, count = 0;
+        while (start < coneMatrices.Length) {
+            count = Mathf.Min(coneMatrices.Length - start, 1000);
+            Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices, count, start);
+            start += count;
+            voronoiCam.Render();
+        }
+        // voronoiCam.Render();
         voronoiTexture.ReadPixels(screenRegionRect, 0, 0);
         voronoiTexture.Apply();
         RenderTexture.active = currentRT;
@@ -226,11 +235,23 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         // Render Points
         if (showPoints) {
             renderParams.material = pointMaterial;
-            Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, pointMatrices);
+            int start = 0, count = 0;
+            while(start < pointMatrices.Length) {
+                count = Mathf.Min(pointMatrices.Length - start, 1000);
+                Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, pointMatrices, count, start);
+                start += count;
+                cam.Render();
+            }
         }
         if (showCentroids) {
             renderParams.material = centroidMaterial;
-            Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, centroidMatrices);
+            int start = 0, count = 0;
+            while(start < centroidMatrices.Length) {
+                count = Mathf.Min(pointMatrices.Length - start, 1000);
+                Graphics.RenderMeshInstanced(renderParams, pointMesh, 0, centroidMatrices, count, start);
+                start += count;
+                cam.Render();
+            }
         }
     }
 
@@ -243,7 +264,7 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
             screenshot.Apply();
             System.IO.File.WriteAllBytes("./Documents/centroidal-voronoi.png", screenshot.EncodeToPNG());
             saveImage = false;
-            currentRT = RenderTexture.active;
+            RenderTexture.active = currentRT;
         }
         Graphics.Blit(source, destination);
     }
