@@ -25,6 +25,10 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     Mesh coneMesh;
     RenderParams renderParams;
     ComputeBuffer colorBuffer;
+    // ComputeBuffer argsBuffer;
+    GraphicsBuffer argsBuffer;
+    // GraphicsBuffer.IndirectDrawIndexedArgs argsBuffer;
+    ComputeBuffer positionsMatrixBuffer;
     NativeArray<Vector3> colors;
     Matrix4x4[] coneMatrices;
     Matrix4x4[] pointMatrices;
@@ -39,7 +43,8 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
     // Constant and Static Member Variables
     const float pointScale = 0.025f;
     const float centroidScale = 0.02f;
-    readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer");
+    readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer"),
+                        positionsMatrixBufferId = Shader.PropertyToID("_PositionsMatrixBuffer");
 
     // Runs when parameter is changed in editor during play
     void OnValidate() {
@@ -59,18 +64,19 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         renderParams = new RenderParams() {
             worldBounds = new Bounds(Vector3.zero, Vector3.one * 7f)
         };
-        int diagramWidth = Screen.width / 4;
-        int diagramHeight = Screen.height / 4;
+        int diagramWidth = Screen.width / 2;
+        int diagramHeight = Screen.height / 2;
         screenRegionRect = new Rect(0, 0, Screen.width, Screen.height);
+        
+        voronoiTexture = new Texture2D(diagramWidth, diagramHeight, TextureFormat.RGBAFloat, false);
         RenderTextureDescriptor descriptor = new RenderTextureDescriptor(diagramWidth, diagramHeight, RenderTextureFormat.ARGBFloat, 32) {
             sRGB = false
         };
-        voronoiTexture = new Texture2D(diagramWidth, diagramHeight, TextureFormat.RGBAFloat, false);
-        // voronoiTextureTarget = new RenderTexture(diagramWidth, diagramHeight, 32 * 4, RenderTextureFormat.ARGBFloat);
         voronoiTextureTarget = new RenderTexture(descriptor);
         voronoiTextureTarget.Create();
         voronoiCam.CopyFrom(cam);
         voronoiCam.targetTexture = voronoiTextureTarget;
+        InitializeBuffer();
     }
 
     // Runs when element is disabled
@@ -78,21 +84,21 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         colors.Dispose();
         colorBuffer.Release();
         colorBuffer = null;
+        argsBuffer.Release();
+        argsBuffer = null;
+        positionsMatrixBuffer.Release();
+        positionsMatrixBuffer = null;
         voronoiTextureTarget.Release();
         voronoiTextureTarget = null;
     }
 
     // Calculates the centroid positions for each voronoi section
     void CalculateCentroids() {
-        // TODO: Centroid calculation works, but could be improved in performance.
         Vector2[] centroidPositions = new Vector2[numPoints];
         int[] counts = new int[numPoints];
         for (int y = 0; y < voronoiTexture.height; y++) {
             for (int x = 0; x < voronoiTexture.width; x++) {
-                // float colorB = voronoiTexture.GetPixel(x, y).b + (0.5f / numPoints);
-                float colorB = voronoiTexture.GetPixel(x, y).b;
-                Debug.Log($"CR: {colorB}");
-                colorB += (0.5f / numPoints);
+                float colorB = voronoiTexture.GetPixel(x, y).b + (0.5f / numPoints);
                 int index = Mathf.FloorToInt(colorB * numPoints);
                 centroidPositions[index] += new Vector2(
                     (x + 0.5f) / (float)voronoiTexture.width,
@@ -146,7 +152,6 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
             pointMatrices[i] = Matrix4x4.TRS(position, pointRotation, Vector3.one * pointScale);
             // Assign Unique Color (will be used when calculating centroid)
             float colorB = i / (float)numPoints;
-            Debug.Log($"VC: {colorB}");
             colors[i] = new Vector3(
                 Random.Range(0f, 1f),
                 Random.Range(0f, 1f),
@@ -192,20 +197,31 @@ public class CentroidalVoronoiGenerator : MonoBehaviour {
         coneMesh.SetTriangles(triangles, 0, true, 0);
     }
 
+    void InitializeBuffer() {
+        GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
+        args[0].indexCountPerInstance = coneMesh.GetIndexCount(0);
+        args[0].instanceCount = (uint)numPoints;
+        args[0].startIndex = coneMesh.GetIndexStart(0);
+        args[0].baseVertexIndex = coneMesh.GetBaseVertex(0);
+        args[0].startInstance = 0;
+        argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
+        argsBuffer.SetData(args);
+
+        positionsMatrixBuffer = new ComputeBuffer(numPoints, sizeof(float) * 16);
+    }
+
     void GenerateVoronoi() {
+        // TODO: Couldn't generate voronoi of more than 1023 regions.
+        // Switching to indirect instancing to increase voronoi count
         renderParams.material = material;
 
         // Render To Texture
         var currentRT = RenderTexture.active;
         RenderTexture.active = voronoiTextureTarget;
-        int start = 0, count = 0;
-        while (start < coneMatrices.Length) {
-            count = Mathf.Min(coneMatrices.Length - start, 1000);
-            Graphics.RenderMeshInstanced(renderParams, coneMesh, 0, coneMatrices, count, start);
-            start += count;
-            voronoiCam.Render();
-        }
-        // voronoiCam.Render();
+        positionsMatrixBuffer.SetData(coneMatrices);
+        material.SetBuffer(positionsMatrixBufferId, positionsMatrixBuffer);
+        Graphics.RenderMeshIndirect(renderParams, coneMesh, argsBuffer);
+        voronoiCam.Render();
         voronoiTexture.ReadPixels(screenRegionRect, 0, 0);
         voronoiTexture.Apply();
         RenderTexture.active = currentRT;

@@ -25,15 +25,21 @@ Shader "Custom/Voronoi Shader" {
                 #endif
             };
 
+
+            StructuredBuffer<float4x4> _PositionsMatrixBuffer;
             StructuredBuffer<float3> _ColorBuffer;
 
             v2f vert(appdata v) {
                 v2f o;
+                float4 pos = v.vertex;
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_TRANSFER_INSTANCE_ID(v, o);
+                float4 pos = mul(_PositionsMatrixBuffer[v.instanceID], v.vertex);
                 #endif
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                // o.vertex = UnityObjectToClipPos(v.vertex);
+                
+                o.vertex = UnityObjectToClipPos(pos);
                 return o;
             }
 
