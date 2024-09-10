@@ -1,97 +1,73 @@
 using UnityEngine;
 
 public class PointManager {
-    Vector3[] colors;
-    Vector3[] points;
-    Matrix4x4[] pointMatrices;
-    Mesh pointMesh;
-    int numPoints;
-
-    Material pointMaterial;
-    RenderParams renderParams;
-    GraphicsBuffer argsBuffer;
+    Vector3[] _colors;
+    Vector3[] _points;
+    Matrix4x4[] _pointMatrices;
+    int _numPoints;
     
-    readonly static int colorBufferId = Shader.PropertyToID("_ColorBuffer"),
-                    positionsMatrixBufferId = Shader.PropertyToID("_PositionsMatricBuffer");
-    const float pointScale = 0.025f;
+    static Mesh _pointMesh = GeneratePointMesh();
+    static float pointScale = 0.02f;
+    static Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
 
-    public PointManager(int numPoints, Color pointColor) {
-        this.numPoints = numPoints;
-        colors = new Vector3[numPoints];
-        points = new Vector3[numPoints];
-        pointMatrices = new Matrix4x4[numPoints];
-        Shader materialShader = Shader.Find("Unlit/Point Shader");
-        pointMaterial = new Material(materialShader);
-        renderParams = new RenderParams(pointMaterial);
-        pointMaterial.color = pointColor;
-        // TODO: Send points position data to GPU for point instance rendering.
-        InitializeBuffer();
+    public PointManager(int numPoints) {
+        _numPoints = numPoints;
+        _colors = new Vector3[numPoints];
+        _points = new Vector3[numPoints];
+        _pointMatrices = new Matrix4x4[numPoints];
+        AssignColors();
     }
 
-    ~PointManager() {
-        Release();
+    public int numPoints {
+        get { return _numPoints; }
     }
 
-    public void Release() {
-        if (argsBuffer != null ) {
-            argsBuffer.Release();
-            argsBuffer = null;
+    public Vector3[] points {
+        get { return _points; }
+    }
+
+    public Vector3[] colors {
+        get { return colors; }
+    }
+
+    public Matrix4x4[] pointMatrices {
+        get { return _pointMatrices; }
+    }
+
+    public Mesh pointMesh {
+        get { return _pointMesh; }
+    }
+
+    public void GenerateRandomPoints() {
+        for(int i = 0; i < _numPoints; i++) {
+            // Calculate Cone Matrix
+            _points[i].x = Random.Range(-1f, 1f) * (Screen.width / (float)Screen.height);
+            _points[i].y = Random.Range(-1f, 1f);
+            _points[i].z = 0f;
+            _pointMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one * pointScale);
         }
     }
 
-    public Vector3[] GetColors() {
-        return colors;
-    }
-
-    public Matrix4x4[] GetMatrices() {
-        return pointMatrices;
-    }
-
-    public void GeneratePoints() {
-        Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
-        for (int i = 0; i < numPoints; i++) {
-            // Calculate Cone Matrix
-            points[i].x = Random.Range(-1f, 1f) * (Screen.width / (float)Screen.height);
-            points[i].y = Random.Range(-1f, 1f);
-            points[i].z = 0f;
-            pointMatrices[i] = Matrix4x4.TRS(points[i], pointRotation, Vector3.one * pointScale);
-            // Assign Unique Color
-            colors[i] = new Vector3(
-                Random.Range(0f, 1f),
-                Random.Range(0f, 1f),
-                (float)i / (float)numPoints
-            );
+    void AssignColors() {
+        for(int i = 0; i < _numPoints; i++) {
+            colors[i].x = Random.Range(0f, 1f);
+            colors[i].y = Random.Range(0f, 1f);
+            colors[i].z = i / (float)_numPoints;
         }
     }
 
     public void UpdatePoints(Vector3[] newPoints) {
-        points = newPoints;
+        _points = newPoints;
         Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
-        for (int i = 0; i < numPoints; i++) {
-            pointMatrices[i] = Matrix4x4.TRS(points[i], pointRotation, Vector3.one * pointScale);
+        for(int i = 0; i < _numPoints; i++) {
+            _pointMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one * pointScale);
         }
     }
+
     
-    public void DrawPoints() {
-        Graphics.RenderMeshIndirect(renderParams, pointMesh, argsBuffer);
-    }
 
-    private void InitializeBuffer() {
-        CreatePointMesh();
-        GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
-        args[0].indexCountPerInstance = pointMesh.GetIndexCount(0);
-        args[0].instanceCount = (uint)numPoints;
-        args[0].startIndex = pointMesh.GetIndexStart(0);
-        args[0].baseVertexIndex = pointMesh.GetBaseVertex(0);
-        args[0].startInstance = 0;
-        argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
-        argsBuffer.SetData(args);
-
-        
-    }
-
-    private void CreatePointMesh() {
-        pointMesh = new Mesh {
+    static Mesh GeneratePointMesh() {
+        Mesh mesh = new Mesh {
             subMeshCount = 1
         };
 
@@ -106,7 +82,8 @@ public class PointManager {
             2, 1, 3
         };
 
-        pointMesh.SetVertices(vertices);
-        pointMesh.SetTriangles(triangles, 0, false, 0);
+        mesh.SetVertices(vertices);
+        mesh.SetTriangles(triangles, 0, true, 0);
+        return mesh;
     }
 }

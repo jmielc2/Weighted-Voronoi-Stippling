@@ -26,14 +26,19 @@ Shader "Unlit/Point Shader" {
                 float4 vertex : SV_POSITION;
             };
 
+            StructuredBuffer<float4x4> _PositionsMatrixBuffer;
             float4 _Color;
 
             v2f vert (appdata v) {
+                v2f o;
+                float4 pos = v.vertex;
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
+                pos = mul(_PositionsMatrixBuffer[v.instanceID], pos);
                 #endif
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                // o.vertex = UnityObjectToClipPos(v.vertex);
+
+                o.vertex = UnityObjectToClipPos(pos);
                 return o;
             }
 

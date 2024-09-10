@@ -35,7 +35,7 @@ Shader "Custom/Voronoi Shader" {
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_TRANSFER_INSTANCE_ID(v, o);
-                pos = mul(_PositionsMatrixBuffer[v.instanceID], v.vertex);
+                pos = mul(_PositionsMatrixBuffer[v.instanceID], pos);
                 #endif
                 // o.vertex = UnityObjectToClipPos(v.vertex);
                 
