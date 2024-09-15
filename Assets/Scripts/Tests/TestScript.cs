@@ -5,46 +5,50 @@ using UnityEngine;
 [RequireComponent(typeof(Camera))]
 public class TestScript : MonoBehaviour {
     Camera cam;
-    [SerializeField] RenderTexture rt;
-    [SerializeField] Texture2D texture;
+    RenderTexture rt;
+    Texture2D texture;
+    [SerializeField] Material material;
 
+    // Create And Link All Components
     void Awake() {
         Debug.Log("Awake");
+        cam = GetComponent<Camera>();
+        material.SetVector(Shader.PropertyToID("_Color"), new Vector4(1000 / 2000f, 0f, 1f));
     }
 
+    // Create Components That Depend on Controls
     void OnEnable() {
         Debug.Log("Enable");
-        cam = GetComponent<Camera>();
         CreateRenderTexture();
+        PrerenderTexture();
+        DestroyRenderTexture();
     }
 
-    // Start is called before the first frame update
+    // Final changes before first frame is rendered
     void Start() {
         Debug.Log("Start");
-        PrerenderTexture();
+        Destroy(transform.GetChild(0).gameObject);
     }
 
-    // Update is called once per frame
-    void Update() {
-        
+    void OnValidate() {
+        Debug.Log("Validate");
     }
 
-    void OnDisable() {
-        rt.Release();    
+    void OnRenderImage(RenderTexture src, RenderTexture dest) {
+        Graphics.Blit(texture, dest);
     }
 
     void PrerenderTexture() {
         cam.targetTexture = rt;
         RenderTexture.active = rt;
         cam.Render();
-        texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false, true) {
+        texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
             filterMode = FilterMode.Point,
         };
         texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
         texture.Apply();
         Color[] colors = texture.GetPixels();
-        Debug.Log($"(0, 0) = {colors[0]}");
-        Debug.Log($"sRGB = {texture.isDataSRGB}");
+        Debug.Log($"Raw => ({colors[0].r}, {colors[0].g}, {colors[0].b})");
         // System.IO.File.WriteAllBytes("./Documents/prerendered.png", texture.EncodeToPNG());
         RenderTexture.active = null;
         cam.targetTexture = null;
@@ -52,8 +56,6 @@ public class TestScript : MonoBehaviour {
 
     void CreateRenderTexture() {
         var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
-            // graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat,
-            sRGB = false,
             depthBufferBits = 32,
             useMipMap = false,
         };
@@ -61,5 +63,10 @@ public class TestScript : MonoBehaviour {
             filterMode = FilterMode.Point
         };
         rt.Create();
+    }
+
+    void DestroyRenderTexture() {
+        rt.Release();
+        rt = null;
     }
 }

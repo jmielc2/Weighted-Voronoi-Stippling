@@ -8,7 +8,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Voronoi Diagram.unity
     guid: 2cda990e2423bbf4892e6590ba056729
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Centroidal Voronoi Diagram.unity
     guid: 7ef0382c998d33c45a2b98847415a854
+  - enabled: 1
+    path: Assets/Scenes/Test.unity
+    guid: cb7c3217181403f45ad3980f6283e280
   m_configObjects: {}
