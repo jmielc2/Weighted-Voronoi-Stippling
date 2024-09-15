@@ -26,7 +26,7 @@ Shader "Custom/Voronoi Shader" {
             };
 
 
-            StructuredBuffer<float4x4> _PositionsMatrixBuffer;
+            StructuredBuffer<float4x4> _PositionMatrixBuffer;
             StructuredBuffer<float3> _ColorBuffer;
 
             v2f vert(appdata v) {
@@ -35,7 +35,7 @@ Shader "Custom/Voronoi Shader" {
                 #if defined(INSTANCING_ON)
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_TRANSFER_INSTANCE_ID(v, o);
-                pos = mul(_PositionsMatrixBuffer[v.instanceID], pos);
+                pos = mul(_PositionMatrixBuffer[v.instanceID], pos);
                 #endif
                 // o.vertex = UnityObjectToClipPos(v.vertex);
                 

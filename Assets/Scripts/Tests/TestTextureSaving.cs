@@ -1,9 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Camera))]
-public class TestScript : MonoBehaviour {
+public class TestTextureSaving : MonoBehaviour {
     Camera cam;
     RenderTexture rt;
     Texture2D texture;
