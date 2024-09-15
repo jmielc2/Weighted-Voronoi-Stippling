@@ -103,7 +103,7 @@ public class VoronoiGenerator : MonoBehaviour {
         colorBuffer.Release();
         positionsMatrixBuffer.Release();
         voronoiTarget.Release();
-        pointArgsBuffer = voronoiArgsBuffer = colorBuffer = positionsMatrixBuffer = voronoiTarget = null;
+        pointArgsBuffer = null;
     }
 
     public Texture2D CreateVoronoiDiagram(int width, int height) {
