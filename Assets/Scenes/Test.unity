@@ -400,8 +400,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  material: {fileID: 2100000, guid: a8498d19675304f3abb8be502ed6bc94, type: 2}
-  resolution: 10
+  material: {fileID: 2100000, guid: 3076cfc6906e644c9bb047cdcc176099, type: 2}
+  resolution: 100
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

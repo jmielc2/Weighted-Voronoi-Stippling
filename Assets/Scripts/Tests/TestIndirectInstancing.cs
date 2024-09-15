@@ -7,26 +7,26 @@ public class TestIndirectInstancing : MonoBehaviour {
 
     [SerializeField] Mesh mesh;
     [SerializeField] Material material;
-    [SerializeField, Range(10, 100)] int resolution;
+    [SerializeField, Range(10, 500)] int resolution;
 
     RenderParams rp;
-    GraphicsBuffer argBuffer;
+    GraphicsBuffer argsBuffer;
     ComputeBuffer positionBuffer;
     ComputeBuffer colorBuffer;
     int numItems;
     float scale;
 
-    void Awake() {
-        Debug.Log("Awake");
-        cam = GetComponent<Camera>();
-    }
-
     void OnValidate() {
         Debug.Log("Validate");
-        if (argBuffer != null) {
+        if (argsBuffer != null) {
             OnDisable();
             OnEnable();
         }
+    }
+
+    void Awake() {
+        Debug.Log("Awake");
+        cam = GetComponent<Camera>();
     }
 
     void OnEnable() {
@@ -40,8 +40,8 @@ public class TestIndirectInstancing : MonoBehaviour {
 
     void OnDisable() {
         Debug.Log("Disable");
-        argBuffer?.Release();
-        argBuffer = null;
+        argsBuffer?.Release();
+        argsBuffer = null;
         positionBuffer?.Release();
         positionBuffer = null;
         colorBuffer?.Release();
@@ -49,12 +49,14 @@ public class TestIndirectInstancing : MonoBehaviour {
     }
 
     void Update() {
-        // Graphics.RenderMeshIndirect(rp, mesh, argBuffer);
+        // Debug.Log("Update");
+        Graphics.RenderMeshIndirect(rp, mesh, argsBuffer);
     }
 
 
 
     void ConfigureRenderPass() {
+        Debug.Log("Configure Renderer");
         material.SetBuffer(Shader.PropertyToID("_PositionMatrixBuffer"), positionBuffer);
         material.SetBuffer(Shader.PropertyToID("_ColorBuffer"), colorBuffer);
         rp = new RenderParams(material) {
@@ -66,6 +68,7 @@ public class TestIndirectInstancing : MonoBehaviour {
     }
 
     void LoadBuffers() {
+        Debug.Log("Load Buffers");
         // Load Command Buffer
         {
             GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
@@ -74,7 +77,7 @@ public class TestIndirectInstancing : MonoBehaviour {
             args[0].instanceCount = (uint)numItems;
             args[0].startIndex = mesh.GetIndexStart(0);
             args[0].startInstance = 0;
-            argBuffer.SetData(args);
+            argsBuffer.SetData(args);
         }
 
         // Load Positions & Colors
@@ -95,7 +98,8 @@ public class TestIndirectInstancing : MonoBehaviour {
     }
 
     void CreateBuffers() {
-        argBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
+        Debug.Log("Create Buffers");
+        argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
         positionBuffer = new ComputeBuffer(numItems, sizeof(float) * 16);
         colorBuffer = new ComputeBuffer(numItems, sizeof(float) * 3);
     }
