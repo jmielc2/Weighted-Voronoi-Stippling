@@ -3,30 +3,37 @@ using UnityEngine.Rendering;
 
 [RequireComponent(typeof(Camera))]
 public class TestIndirectInstancing : MonoBehaviour {
-    Camera cam;
-
-    [SerializeField] Mesh mesh;
     [SerializeField] Material material;
     [SerializeField, Range(10, 500)] int resolution;
 
+    Mesh mesh;
+    Camera cam;
     RenderParams rp;
     GraphicsBuffer argsBuffer;
     ComputeBuffer positionBuffer;
     ComputeBuffer colorBuffer;
     int numItems;
     float scale;
+    Bounds renderBounds;
+    RenderTexture rt;
+    Texture2D texture;
+    bool validating = false;
 
     void OnValidate() {
         Debug.Log("Validate");
+        validating = true;
         if (argsBuffer != null) {
             OnDisable();
             OnEnable();
         }
+        validating = false;
     }
 
     void Awake() {
         Debug.Log("Awake");
         cam = GetComponent<Camera>();
+        renderBounds = new Bounds(Vector3.zero, Vector3.one * 2f);
+        CreateMesh();
     }
 
     void OnEnable() {
@@ -36,6 +43,13 @@ public class TestIndirectInstancing : MonoBehaviour {
         CreateBuffers();
         LoadBuffers();
         ConfigureRenderPass();
+        if (!validating) {
+            CreateRenderTexture();
+            PrerenderTexture();
+            DestroyRenderTexture();
+        } else {
+            texture = null;
+        }
     }
 
     void OnDisable() {
@@ -46,14 +60,59 @@ public class TestIndirectInstancing : MonoBehaviour {
         positionBuffer = null;
         colorBuffer?.Release();
         colorBuffer = null;
+        DestroyRenderTexture();
     }
 
     void Update() {
+        if (texture == null) {
+            CreateRenderTexture();
+            PrerenderTexture();
+            DestroyRenderTexture();
+        }
+
         // Debug.Log("Update");
-        Graphics.RenderMeshIndirect(rp, mesh, argsBuffer);
+        if (Input.GetKeyDown(KeyCode.S) && texture != null) {
+            Debug.Log("Writing texture to file.");
+            System.IO.File.WriteAllBytes("./Documents/prerendered.png", texture.EncodeToPNG());
+        }
     }
 
+    void OnRenderImage(RenderTexture src, RenderTexture dest) {
+        Graphics.Blit(texture, dest);
+    }
 
+    void PrerenderTexture() {
+        Debug.Log("Prerender Texture");
+        cam.targetTexture = rt;
+        RenderTexture.active = rt;
+        Graphics.RenderMeshIndirect(rp, mesh, argsBuffer);
+        cam.Render();
+        texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
+            filterMode = FilterMode.Point,
+        };
+        texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        texture.Apply();
+        RenderTexture.active = null;
+        cam.targetTexture = null;
+    }
+
+    void CreateMesh() {
+        Debug.Log("Create Mesh");
+        mesh = new Mesh {
+            subMeshCount = 1,
+            vertices = new Vector3[] {
+                new(-0.5f, -0.5f, 0f),
+                new (-0.5f, 0.5f, 0f),
+                new (0.5f, -0.5f, 0f),
+                new (0.5f, 0.5f, 0f),
+            },
+            bounds = renderBounds,
+        };
+        mesh.SetTriangles(new int[] {
+                0, 1, 2,
+                2, 1, 3
+        }, 0, false);
+    }
 
     void ConfigureRenderPass() {
         Debug.Log("Configure Renderer");
@@ -62,7 +121,7 @@ public class TestIndirectInstancing : MonoBehaviour {
         rp = new RenderParams(material) {
             camera = cam,
             receiveShadows = false,
-            worldBounds = new Bounds(new Vector3(0, 0, 0.5f), Vector3.one * 3f),
+            worldBounds = renderBounds,
             shadowCastingMode = ShadowCastingMode.Off,
         };
     }
@@ -84,7 +143,7 @@ public class TestIndirectInstancing : MonoBehaviour {
         {
             Matrix4x4[] positions = new Matrix4x4[numItems];
             Vector3[] colors = new Vector3[numItems];
-            Vector3 pos = new Vector3(0f, 0f, 0.5f);
+            Vector3 pos = Vector3.zero;
             for (int i = 0; i < numItems; i++) {
                 pos.y = (((i / resolution) + 0.5f) / resolution) * 2f - 1f;
                 pos.x = (((i % resolution) + 0.5f) / resolution) * 2f - 1f;
@@ -102,5 +161,22 @@ public class TestIndirectInstancing : MonoBehaviour {
         argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
         positionBuffer = new ComputeBuffer(numItems, sizeof(float) * 16);
         colorBuffer = new ComputeBuffer(numItems, sizeof(float) * 3);
+    }
+
+    void CreateRenderTexture() {
+        Debug.Log("Create Render Texture");
+        var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
+            depthBufferBits = 32,
+            useMipMap = false,
+        };
+        rt = new RenderTexture(rtDescriptor) {
+            filterMode = FilterMode.Point
+        };
+        rt.Create();
+    }
+
+    void DestroyRenderTexture() {
+        rt?.Release();
+        rt = null;
     }
 }

@@ -64,7 +64,7 @@ public class TestTextureSaving : MonoBehaviour {
     }
 
     void DestroyRenderTexture() {
-        rt.Release();
+        rt?.Release();
         rt = null;
     }
 }
