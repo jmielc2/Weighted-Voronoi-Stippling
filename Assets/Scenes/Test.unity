@@ -399,8 +399,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 457ecd3e8275e41fc937a5c121740e06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  material: {fileID: 2100000, guid: 3076cfc6906e644c9bb047cdcc176099, type: 2}
-  resolution: 100
+  material: {fileID: 2100000, guid: 9ceb3713caa3346f6ab8252b64de4509, type: 2}
+  resolution: 10
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

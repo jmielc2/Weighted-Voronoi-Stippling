@@ -155,6 +155,8 @@ MonoBehaviour:
   numRegions: 100
   showPoints: 1
   pointColor: {r: 0.09803922, g: 0.09803922, b: 0.09803922, a: 1}
+  material: {fileID: 2100000, guid: 76196e07c9330466bb169ac38b1cbe14, type: 2}
+  pointMaterial: {fileID: 2100000, guid: ff7e33a59da9a47d68a506f70c516114, type: 2}
 --- !u!20 &635015931
 Camera:
   m_ObjectHideFlags: 0

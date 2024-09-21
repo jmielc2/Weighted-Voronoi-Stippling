@@ -9,11 +9,11 @@ public class VoronoiVisualizer : MonoBehaviour {
     protected bool showPoints = true;
     [SerializeField]
     protected Color pointColor = new(0.1f, 0.1f, 0.1f, 1f);
-
+    [SerializeField]
+    protected Material material, pointMaterial;
 
     // Private Member Variables
     protected Camera cam;
-    protected Material material, pointMaterial;
     protected DataManager data;
     protected RenderParams rp;
     protected GraphicsBuffer argsBuffer, pointArgsBuffer;
@@ -46,7 +46,6 @@ public class VoronoiVisualizer : MonoBehaviour {
         DataManager.CreateConeMesh(cam);
     }
 
-    // Runs when element is enabled
     protected void OnEnable() {
         Debug.Log("Enabling");
         if (data == null || data.NumPoints != numRegions) {
@@ -118,12 +117,12 @@ public class VoronoiVisualizer : MonoBehaviour {
     protected virtual void ConfigureRenderPass() {
         Debug.Log("Configuring renderer.");
         // Voronoi Material
-        material = new Material(Shader.Find("Custom/Indirect Voronoi Shader"));
+        // material = new Material(Shader.Find("Custom/Indirect Voronoi Shader"));
         material.SetBuffer(positionBufferId, positionBuffer);
         material.SetBuffer(colorBufferId, colorBuffer);
 
         // Point Material
-        pointMaterial = new Material(Shader.Find("Unlit/Indirect Point Shader"));
+        // pointMaterial = new Material(Shader.Find("Unlit/Indirect Point Shader"));
         pointMaterial.SetBuffer(positionBufferId, pointPositionBuffer);
         pointMaterial.SetVector(colorId, pointColor);
 
