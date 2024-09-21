@@ -3,6 +3,7 @@ using UnityEngine;
 public class DataManager {
     readonly Vector3[] _colors;
     Vector3[] _points;
+    Vector3[] _centroids;
     readonly Matrix4x4[] _pointMatrices;
     readonly Matrix4x4[] _coneMatrices;
     readonly int numPoints;
@@ -13,6 +14,7 @@ public class DataManager {
     Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
 
     public DataManager(int numRegions, Camera cam) {
+        Debug.Log("Generating data");
         numPoints = numRegions;
         _colors = new Vector3[numPoints];
         _points = new Vector3[numPoints];
@@ -30,10 +32,14 @@ public class DataManager {
             }
             _points = value;
             for(int i = 0; i < numPoints; i++) {
-                _coneMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one);
+                _coneMatrices[i] = Matrix4x4.TRS(_points[i], Quaternion.identity, Vector3.one);
                 _pointMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one * pointScale);
             }
         }
+    }
+
+    public int NumPoints {
+        get { return numPoints; }
     }
 
     public Vector3[] Colors {
@@ -79,10 +85,10 @@ public class DataManager {
         _pointMesh = new Mesh {
             subMeshCount = 1,
             vertices = new Vector3[] {
-                new (-1f, -1f, 0f),
-                new (1f, -1f, 0f),
-                new (-1f, 1f, 0f),
-                new (1f, 1f, 0f)
+                new (-0.5f, -0.5f, 0f),
+                new (-0.5f, 0.5f, 0f),
+                new (0.5f, -0.5f, 0f),
+                new (0.5f, 0.5f, 0f)
             }
         };
         _pointMesh.SetTriangles(new int[] {

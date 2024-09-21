@@ -4,22 +4,31 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(Camera))]
 public class VoronoiVisualizer : MonoBehaviour {
     [SerializeField, Range(1, 20000)]
-    int numRegions;
+    protected int numRegions = 100;
+    [SerializeField]
+    protected bool showPoints = true;
+    [SerializeField]
+    protected Color pointColor = new(0.1f, 0.1f, 0.1f, 1f);
+
 
     // Private Member Variables
-    Camera cam;
-    Material material, pointMaterial;
-    DataManager data;
-    RenderParams rp;
-    GraphicsBuffer argsBuffer;
-    ComputeBuffer positionBuffer;
-    ComputeBuffer colorBuffer;
-    Bounds renderBounds;
-    RenderTexture rt;
-    Texture2D texture;
-    bool validating = false;
+    protected Camera cam;
+    protected Material material, pointMaterial;
+    protected DataManager data;
+    protected RenderParams rp;
+    protected GraphicsBuffer argsBuffer, pointArgsBuffer;
+    protected ComputeBuffer positionBuffer, pointPositionBuffer, colorBuffer;
+    protected Bounds renderBounds;
+    protected RenderTexture rt;
+    protected Texture2D texture;
+    protected bool validating = false;
 
-    void OnValidate() {
+    protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
+                        colorBufferId = Shader.PropertyToID("_ColorBuffer"),
+                        colorId = Shader.PropertyToID("_Color");
+                        
+
+    protected void OnValidate() {
         Debug.Log("Validating");
         validating = true;
         if (argsBuffer != null) {
@@ -27,10 +36,9 @@ public class VoronoiVisualizer : MonoBehaviour {
             OnEnable();
         }
         validating = false;
-        Debug.Log("Done validating");
     }
 
-    void Awake() {
+    protected void Awake() {
         Debug.Log("Awake");
         cam = GetComponent<Camera>();
         renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
@@ -39,35 +47,41 @@ public class VoronoiVisualizer : MonoBehaviour {
     }
 
     // Runs when element is enabled
-    void OnEnable() {
+    protected void OnEnable() {
         Debug.Log("Enabling");
-        data = new DataManager(numRegions, cam);
+        if (data == null || data.NumPoints != numRegions) {
+            data = new DataManager(numRegions, cam);
+        }
         CreateBuffers();
         LoadBuffers();
         ConfigureRenderPass();
         RenderToTexture();
     }
 
-    void OnDisable() {
+    protected void OnDisable() {
         Debug.Log("Disabling");
         argsBuffer?.Release();
         argsBuffer = null;
+        pointArgsBuffer?.Release();
+        pointArgsBuffer = null;
         positionBuffer?.Release();
         positionBuffer = null;
+        pointPositionBuffer?.Release();
+        pointPositionBuffer = null;
         colorBuffer?.Release();
         colorBuffer = null;
         texture = null;
         DestroyRenderTexture();
     }
 
-    void Update() {
+    private void Update() {
         if (rt == null) {
             RenderToTexture();
         }
 
         if (Input.GetKeyDown(KeyCode.S)) {
             Debug.Log("Writing texture to file.");
-            texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false, true) {
+            texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
                 filterMode = FilterMode.Point,
             };
             RenderTexture.active = rt;
@@ -78,11 +92,11 @@ public class VoronoiVisualizer : MonoBehaviour {
         }
     }
 
-    void OnRenderImage(RenderTexture source, RenderTexture destination) {
+    private void OnRenderImage(RenderTexture source, RenderTexture destination) {
         Graphics.Blit(rt, destination);
     }
 
-    void RenderToTexture() {
+    protected virtual void RenderToTexture() {
         if (validating) {
             return;
         }
@@ -90,18 +104,30 @@ public class VoronoiVisualizer : MonoBehaviour {
         Debug.Log("Prerendering texture");
         cam.targetTexture = rt;
         RenderTexture.active = rt;
+        rp.material = material;
         Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
+        if (showPoints) {
+            rp.material = pointMaterial;
+            Graphics.RenderMeshIndirect(rp, data.PointMesh, pointArgsBuffer);
+        }
         cam.Render();
         RenderTexture.active = null;
         cam.targetTexture = null;
     }
 
-    void ConfigureRenderPass() {
+    protected virtual void ConfigureRenderPass() {
         Debug.Log("Configuring renderer.");
+        // Voronoi Material
         material = new Material(Shader.Find("Custom/Indirect Voronoi Shader"));
-        material.SetBuffer(Shader.PropertyToID("_PositionMatrixBuffer"), positionBuffer);
-        material.SetBuffer(Shader.PropertyToID("_ColorBuffer"), colorBuffer);
-        rp = new RenderParams(material) {
+        material.SetBuffer(positionBufferId, positionBuffer);
+        material.SetBuffer(colorBufferId, colorBuffer);
+
+        // Point Material
+        pointMaterial = new Material(Shader.Find("Unlit/Indirect Point Shader"));
+        pointMaterial.SetBuffer(positionBufferId, pointPositionBuffer);
+        pointMaterial.SetVector(colorId, pointColor);
+
+        rp = new RenderParams() {
             camera = cam,
             receiveShadows = false,
             worldBounds = renderBounds,
@@ -109,35 +135,42 @@ public class VoronoiVisualizer : MonoBehaviour {
         };
     }
 
-    void LoadBuffers() {
+    protected virtual void CreateBuffers() {
+        Debug.Log("Creating buffers.");
+        argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
+        pointArgsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
+        positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
+        pointPositionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
+        colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
+    }
+
+    protected virtual void LoadBuffers() {
         Debug.Log("Loading buffers.");
         // Load Command Buffer
         {
-            Mesh mesh = data.ConeMesh;
-            GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
-            args[0].baseVertexIndex = mesh.GetBaseVertex(0);
-            args[0].indexCountPerInstance = mesh.GetIndexCount(0);
-            args[0].instanceCount = (uint)numRegions;
-            args[0].startIndex = mesh.GetIndexStart(0);
-            args[0].startInstance = 0;
-            argsBuffer.SetData(args);
+            LoadArgBuffer(argsBuffer, data.ConeMesh);
+            LoadArgBuffer(pointArgsBuffer, data.PointMesh);
         }
         
         // Load Positions & Colors
         {
             positionBuffer.SetData(data.ConeMatrices);
+            pointPositionBuffer.SetData(data.PointMatrices);
             colorBuffer.SetData(data.Colors);
         }
     }
 
-    void CreateBuffers() {
-        Debug.Log("Creating buffers.");
-        argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
-        positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
-        colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
+    protected virtual void LoadArgBuffer(GraphicsBuffer buffer, Mesh mesh) {
+        GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
+        args[0].baseVertexIndex = mesh.GetBaseVertex(0);
+        args[0].indexCountPerInstance = mesh.GetIndexCount(0);
+        args[0].instanceCount = (uint)numRegions;
+        args[0].startIndex = mesh.GetIndexStart(0);
+        args[0].startInstance = 0;
+        buffer.SetData(args);
     }
 
-    void CreateRenderTexture() {
+    protected virtual void CreateRenderTexture() {
         Debug.Log("Creating render texture.");
         var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
             depthBufferBits = 32,
@@ -149,7 +182,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         rt.Create();
     }
 
-    void DestroyRenderTexture() {
+    protected virtual void DestroyRenderTexture() {
         rt?.Release();
         rt = null;
     }

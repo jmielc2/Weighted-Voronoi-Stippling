@@ -1,44 +1,38 @@
-Shader "Unlit/Point Shader" {
+Shader "Unlit/Indirect Point Shader" {
     Properties {
-        _Color ("Color", Color) = (0, 0, 0, 0)
+        _Color ("Color", Vector) = (0, 0, 0, 1)
     }
 
     SubShader {
         Tags { "RenderType"="Opaque" }
+        LOD 100
 
         Pass {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_instancing
-            #pragma instancing_options assumeuniformscaling
 
             #include "UnityCG.cginc"
+            #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawIndexedArgs
+            #include "UnityIndirect.cginc"
 
             struct appdata {
                 float4 vertex : POSITION;
-                #if defined(INSTANCING_ON)
                 uint instanceID : SV_InstanceID;
-                #endif
             };
 
             struct v2f {
                 float4 vertex : SV_POSITION;
             };
 
-            StructuredBuffer<float4x4> _PositionsMatrixBuffer;
+            StructuredBuffer<float4x4> _PositionMatrixBuffer;
             float4 _Color;
 
             v2f vert (appdata v) {
+                InitIndirectDrawArgs(0);
                 v2f o;
-                float4 pos = v.vertex;
-                #if defined(INSTANCING_ON)
-                UNITY_SETUP_INSTANCE_ID(v);
-                pos = mul(_PositionsMatrixBuffer[v.instanceID], pos);
-                #endif
-                // o.vertex = UnityObjectToClipPos(v.vertex);
-
-                o.vertex = UnityObjectToClipPos(pos);
+                o.vertex = mul(_PositionMatrixBuffer[v.instanceID], v.vertex);
+                o.vertex = UnityObjectToClipPos(o.vertex);
                 return o;
             }
 

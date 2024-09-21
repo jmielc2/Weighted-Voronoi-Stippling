@@ -153,6 +153,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   numRegions: 100
+  showPoints: 1
+  pointColor: {r: 0.09803922, g: 0.09803922, b: 0.09803922, a: 1}
 --- !u!20 &635015931
 Camera:
   m_ObjectHideFlags: 0
