@@ -302,7 +302,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 02a2f2b80e5797f40a4114851332ee28, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  material: {fileID: 2100000, guid: f7f7b838cf19b4829b90e286746d628e, type: 2}
+  color: {r: 0.39215687, g: 0.78431374, b: 0.19607843, a: 1}
 --- !u!1 &1980935466
 GameObject:
   m_ObjectHideFlags: 0
@@ -320,7 +320,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 2147483647
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!20 &1980935467
 Camera:
   m_ObjectHideFlags: 0

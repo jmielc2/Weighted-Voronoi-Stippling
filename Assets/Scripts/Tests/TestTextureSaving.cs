@@ -5,13 +5,15 @@ public class TestTextureSaving : MonoBehaviour {
     Camera cam;
     RenderTexture rt;
     Texture2D texture;
-    [SerializeField] Material material;
-
+    Material material;
+    [SerializeField] Color color;
     // Create And Link All Components
     void Awake() {
         Debug.Log("Awake");
         cam = GetComponent<Camera>();
-        material.SetVector(Shader.PropertyToID("_Color"), new Vector4(1000 / 2000f, 0f, 1f));
+        material = new Material(Shader.Find("Unlit/Test Shader"));
+        material.SetVector(Shader.PropertyToID("_Color"), color);
+        transform.GetChild(0).gameObject.GetComponent<MeshRenderer>().material = material;
     }
 
     // Create Components That Depend on Controls

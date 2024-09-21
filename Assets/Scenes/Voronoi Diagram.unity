@@ -152,10 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40bcda4c792ea4ecaa715d9e1db5cde6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pointColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
-  numRegions: 1
-  showPoints: 1
-  voronoiGenerator: {fileID: 0}
+  numRegions: 100
 --- !u!20 &635015931
 Camera:
   m_ObjectHideFlags: 0
