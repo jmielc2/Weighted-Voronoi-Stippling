@@ -6,12 +6,11 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
     [SerializeField]
     protected Color centroidColor = new(0.8f, 0.1f, 0.1f, 1f);
 
-    private void Update() {
+    protected override void Update() {
         if (rt == null) {
             RenderToTexture();
         }
 
-        Debug.Log("Updating");
         if (Input.GetKeyDown(KeyCode.S)) {
             Debug.Log("Writing texture to file.");
             texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
@@ -25,12 +24,8 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         }
     }
 
-    private void OnRenderImage(RenderTexture source, RenderTexture dest) {
-        Graphics.Blit(rt, dest);
-    }
-
     // Calculates the centroid positions for each voronoi section
-    void CalculateCentroids() {
+    // void CalculateCentroids() {
         // Vector3[] centroidPositions = new Vector3[numRegions];
         // int[] counts = new int[numRegions];
         // for (int y = 0; y < texture.height; y++) {
@@ -59,5 +54,5 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         // }
         // Debug.Log("Centroids generated.");
         // UpdatePoints(centroidPositions);
-    }
+    // }
 }

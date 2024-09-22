@@ -28,7 +28,7 @@ public class VoronoiVisualizer : MonoBehaviour {
                         colorId = Shader.PropertyToID("_Color");
                         
 
-    protected void OnValidate() {
+    protected virtual void OnValidate() {
         Debug.Log("Validating");
         validating = true;
         if (argsBuffer != null) {
@@ -38,7 +38,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         validating = false;
     }
 
-    protected void Awake() {
+    protected virtual void Awake() {
         Debug.Log("Awake");
         cam = GetComponent<Camera>();
         renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
@@ -46,7 +46,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         DataManager.CreateConeMesh(cam);
     }
 
-    protected void OnEnable() {
+    protected virtual void OnEnable() {
         Debug.Log("Enabling");
         if (data == null || data.NumPoints != numRegions) {
             data = new DataManager(numRegions, cam);
@@ -57,7 +57,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         RenderToTexture();
     }
 
-    protected void OnDisable() {
+    protected virtual void OnDisable() {
         Debug.Log("Disabling");
         argsBuffer?.Release();
         argsBuffer = null;
@@ -73,11 +73,11 @@ public class VoronoiVisualizer : MonoBehaviour {
         DestroyRenderTexture();
     }
 
-    private void Update() {
+    protected virtual void Update() {
         if (rt == null) {
             RenderToTexture();
         }
-
+        
         if (Input.GetKeyDown(KeyCode.S)) {
             Debug.Log("Writing texture to file.");
             texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
@@ -91,7 +91,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         }
     }
 
-    private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+    protected virtual void OnRenderImage(RenderTexture source, RenderTexture destination) {
         Graphics.Blit(rt, destination);
     }
 
