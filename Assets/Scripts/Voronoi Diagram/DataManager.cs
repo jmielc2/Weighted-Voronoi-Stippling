@@ -1,10 +1,12 @@
 using UnityEngine;
 
+// TODO: Update data manager to handle centroids as well.
 public class DataManager {
     readonly Vector3[] _colors;
     Vector3[] _points;
     Vector3[] _centroids;
     readonly Matrix4x4[] _pointMatrices;
+    readonly Matrix4x4[] _centroidMatrices;
     readonly Matrix4x4[] _coneMatrices;
     readonly int numPoints;
     
@@ -18,6 +20,7 @@ public class DataManager {
         numPoints = numRegions;
         _colors = new Vector3[numPoints];
         _points = new Vector3[numPoints];
+        _centroids = (Vector3[])_points.Clone();
         _pointMatrices = new Matrix4x4[numPoints];
         _coneMatrices = new Matrix4x4[numPoints];
         AssignColors();
@@ -26,15 +29,9 @@ public class DataManager {
 
     public Vector3[] Points {
         get { return _points; }
-        set {
-            if (_points.Length != value.Length) {
-                return;
-            }
+        private set {
             _points = value;
-            for(int i = 0; i < numPoints; i++) {
-                _coneMatrices[i] = Matrix4x4.TRS(_points[i], Quaternion.identity, Vector3.one);
-                _pointMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one * pointScale);
-            }
+            // Update Matrices
         }
     }
 
@@ -50,6 +47,10 @@ public class DataManager {
         get { return _pointMatrices; }
     }
 
+    public Matrix4x4[] CentroidMatrices {
+        get { return _centroidMatrices; }
+    }
+
     public Matrix4x4[] ConeMatrices {
         get { return _coneMatrices; }
     }
@@ -62,7 +63,7 @@ public class DataManager {
         get { return _coneMesh; }
     }
 
-    void GenerateRandomPoints(Camera cam) {
+    private void GenerateRandomPoints(Camera cam) {
         for(int i = 0; i < numPoints; i++) {
             // Calculate Cone Matrix
             _points[i].x = Random.Range(-1f, 1f) * cam.aspect;
@@ -73,12 +74,16 @@ public class DataManager {
         }
     }
 
-    void AssignColors() {
+    private void AssignColors() {
         for(int i = 0; i < numPoints; i++) {
             _colors[i].x = Random.Range(0f, 1f);
             _colors[i].y = Random.Range(0f, 1f);
             _colors[i].z = i / (float)numPoints;
         }
+    }
+
+    public void UpdatePoints(Texture2D voronoi) {
+
     }
 
     public static void CreatePointMesh() {

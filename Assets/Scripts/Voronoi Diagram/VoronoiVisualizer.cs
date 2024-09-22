@@ -20,7 +20,6 @@ public class VoronoiVisualizer : MonoBehaviour {
     protected ComputeBuffer positionBuffer, pointPositionBuffer, colorBuffer;
     protected Bounds renderBounds;
     protected RenderTexture rt;
-    protected Texture2D texture;
     protected bool validating = false;
 
     protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
@@ -69,7 +68,6 @@ public class VoronoiVisualizer : MonoBehaviour {
         pointPositionBuffer = null;
         colorBuffer?.Release();
         colorBuffer = null;
-        texture = null;
         DestroyRenderTexture();
     }
 
@@ -80,14 +78,13 @@ public class VoronoiVisualizer : MonoBehaviour {
         
         if (Input.GetKeyDown(KeyCode.S)) {
             Debug.Log("Writing texture to file.");
-            texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
+            Texture2D texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
                 filterMode = FilterMode.Point,
             };
             RenderTexture.active = rt;
             texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
             RenderTexture.active = null;
             System.IO.File.WriteAllBytes("./Documents/voronoi-diagram.png", texture.EncodeToPNG());
-            texture = null;
         }
     }
 
@@ -100,7 +97,7 @@ public class VoronoiVisualizer : MonoBehaviour {
             return;
         }
         CreateRenderTexture();
-        Debug.Log("Prerendering texture");
+        Debug.Log("Rendering to texture");
         cam.targetTexture = rt;
         RenderTexture.active = rt;
         rp.material = material;
@@ -117,12 +114,10 @@ public class VoronoiVisualizer : MonoBehaviour {
     protected virtual void ConfigureRenderPass() {
         Debug.Log("Configuring renderer.");
         // Voronoi Material
-        // material = new Material(Shader.Find("Custom/Indirect Voronoi Shader"));
         material.SetBuffer(positionBufferId, positionBuffer);
         material.SetBuffer(colorBufferId, colorBuffer);
 
         // Point Material
-        // pointMaterial = new Material(Shader.Find("Unlit/Indirect Point Shader"));
         pointMaterial.SetBuffer(positionBufferId, pointPositionBuffer);
         pointMaterial.SetVector(colorId, pointColor);
 
@@ -169,7 +164,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         buffer.SetData(args);
     }
 
-    protected virtual void CreateRenderTexture() {
+    protected void CreateRenderTexture() {
         Debug.Log("Creating render texture.");
         var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
             depthBufferBits = 32,
