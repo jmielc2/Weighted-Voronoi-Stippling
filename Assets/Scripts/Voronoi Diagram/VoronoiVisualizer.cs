@@ -3,14 +3,14 @@ using UnityEngine.Rendering;
 
 [RequireComponent(typeof(Camera))]
 public class VoronoiVisualizer : MonoBehaviour {
+    [SerializeField]
+    protected Material material, pointMaterial;
     [SerializeField, Range(1, 20000)]
     protected int numRegions = 100;
     [SerializeField]
     protected bool showPoints = true;
     [SerializeField]
     protected Color pointColor = new(0.1f, 0.1f, 0.1f, 1f);
-    [SerializeField]
-    protected Material material, pointMaterial;
 
     // Private Member Variables
     protected Camera cam;
@@ -27,7 +27,7 @@ public class VoronoiVisualizer : MonoBehaviour {
                         colorId = Shader.PropertyToID("_Color");
                         
 
-    protected virtual void OnValidate() {
+    protected void OnValidate() {
         Debug.Log("Validating");
         validating = true;
         if (argsBuffer != null) {

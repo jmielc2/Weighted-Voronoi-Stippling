@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class CentroidVoronoiGenerator : VoronoiVisualizer {
     [SerializeField]
@@ -18,9 +19,9 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
             data = new DataManager(numRegions, cam);
         }
         CreateBuffers();
+        CreateTextures();
         LoadBuffers();
         ConfigureRenderPass();
-        CreateTextures();
         if (!validating) {
             Render();
         }
@@ -28,6 +29,8 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
 
     protected override void OnDisable() {
         base.OnDisable();
+        centroidPositionBuffer?.Release();
+        centroidPositionBuffer = null;
         voronoi = null;
         rendered = false;
     }
@@ -51,7 +54,7 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
 
     protected void Render() {
         PrerenderTexture();
-        data.UpdatePoints(voronoi);
+        data.UpdateCentroids(voronoi, cam);
         centroidPositionBuffer.SetData(data.CentroidMatrices);
         RenderToTexture();
         rendered = true;
@@ -62,7 +65,9 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         cam.targetTexture = rt;
         RenderTexture.active = rt;
         rp.material = material;
+        rp.matProps = null;
         Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
+        cam.clearFlags = CameraClearFlags.SolidColor;
         cam.Render();
         voronoi.ReadPixels(screenReadRegion, 0, 0);
         RenderTexture.active = null;
@@ -78,11 +83,14 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         RenderTexture.active = rt;
         rp.material = pointMaterial;
         if (showPoints) {
+            rp.matProps = pointPb;
             Graphics.RenderMeshIndirect(rp, data.PointMesh, pointArgsBuffer);
         }
         if (showCentroids) {
+            rp.matProps = centroidPb;
             Graphics.RenderMeshIndirect(rp, data.PointMesh, pointArgsBuffer);
         }
+        cam.clearFlags = CameraClearFlags.Nothing;
         cam.Render();
         RenderTexture.active = null;
         cam.targetTexture = null;
@@ -90,8 +98,28 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
 
     // TODO: Update ConfigureRenderPass for property blocks.
     protected override void ConfigureRenderPass() {
-        base.ConfigureRenderPass();
+        Debug.Log("Configure render pass.");
         screenReadRegion = new Rect(0, 0, rt.width, rt.height);
+        centroidPb = new MaterialPropertyBlock();
+        pointPb = new MaterialPropertyBlock();
+
+        // Voronoi Material
+        material.SetBuffer(positionBufferId, positionBuffer);
+        material.SetBuffer(colorBufferId, colorBuffer);
+
+        // Point & Centroid Material
+        pointPb.SetBuffer(positionBufferId, pointPositionBuffer);
+        pointPb.SetVector(colorId, pointColor);
+        centroidPb.SetBuffer(positionBufferId, centroidPositionBuffer);
+        centroidPb.SetVector(colorId, centroidColor);
+        
+        rp = new RenderParams() {
+            camera = cam,
+            receiveShadows = false,
+            worldBounds = renderBounds,
+            shadowCastingMode = ShadowCastingMode.Off
+        };
+        
     }
 
     protected void CreateTextures() {
@@ -101,39 +129,8 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         };
     }
 
-    // TODO: Update CreateBuffers for centroidPositionBuffer
     protected override void CreateBuffers() {
         base.CreateBuffers();
+        centroidPositionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
     }
-
-    // Calculates the centroid positions for each voronoi section
-    //void CalculateCentroids() {
-    //    int[] counts = new int[numRegions];
-    //    for (int y = 0; y < texture.height; y++) {
-    //        for (int x = 0; x < texture.width; x++) {
-    //            float colorB = texture.GetPixel(x, y).b + (0.5f / numRegions);
-    //            int index = Mathf.FloorToInt(colorB * numRegions);
-    //            centroids[index] += new Vector3(
-    //                (x + 0.5f) / (float)texture.width,
-    //                (y + 0.5f) / (float)texture.height
-    //            );
-    //            counts[index]++;
-    //        }
-    //    }
-    //    for (int i = 0; i < numRegions; i++) {
-    //        Vector3 centroid = Vector3.zero;
-    //        if (counts[i] == 0) {
-    //            Debug.Log($"Index {i} has count of 0.");
-    //        } else {
-    //            float scalar = 2f / counts[i];
-    //            centroid.x = (centroids[i].x * scalar - 1f) * cam.aspect;
-    //            centroid.y = centroids[i].y * scalar - 1f;
-    //            centroidPositions[i] = centroid;
-    //            centroid.z = centroidScale * 0.5f;
-    //            centroidMatrices[i] = Matrix4x4.TRS(centroid, Quaternion.identity, Vector3.one * centroidScale);
-    //        }
-    //    }
-    //    Debug.Log("Centroids generated.");
-    //    UpdatePoints(centroidPositions);
-    //}
 }

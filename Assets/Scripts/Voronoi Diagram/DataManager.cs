@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 // TODO: Update data manager to handle centroids as well.
 public class DataManager {
@@ -25,14 +27,11 @@ public class DataManager {
         _coneMatrices = new Matrix4x4[numPoints];
         AssignColors();
         GenerateRandomPoints(cam);
+        _centroidMatrices = (Matrix4x4[])_pointMatrices.Clone();
     }
 
     public Vector3[] Points {
         get { return _points; }
-        private set {
-            _points = value;
-            // Update Matrices
-        }
     }
 
     public int NumPoints {
@@ -82,8 +81,39 @@ public class DataManager {
         }
     }
 
-    public void UpdatePoints(Texture2D voronoi) {
-
+    public void UpdateCentroids(Texture2D voronoi, Camera cam) {
+        int[] counts = new int[numPoints];
+        Color[] colors = voronoi.GetPixels();
+        for (int y = 0; y < voronoi.height; y++) {
+            for (int x = 0; x < voronoi.width; x++) {
+                double b = (double)colors[y * voronoi.width + x].b;
+                double i = b * numPoints + 0.5;
+                int index = Convert.ToInt32(Math.Floor(i));
+                if (index >= numPoints || index < 0) {
+                    // Debug.Log($"Index {index} is outside range. i = {i}, b = {b}");
+                    continue;
+                }
+                // Debug.Log($"{b} => {i} => {index}");
+                if (counts[index] == 0) {
+                    _centroids[index] = Vector3.zero;
+                }
+                _centroids[index] += new Vector3(
+                    (x + 0.5f) / (float)voronoi.width,
+                    (y + 0.5f) / (float)voronoi.height, 0f
+                );
+                counts[index]++;
+            }
+        }
+        for (int i = 0; i < numPoints; i++) {
+            if (counts[i] == 0) {
+                // Debug.Log($"Index {i} has count of 0.");
+            } else {
+                float scalar = 2f / counts[i];
+                _centroids[i].x = (_centroids[i].x * scalar - 1f) * cam.aspect;
+                _centroids[i].y = _centroids[i].y * scalar - 1f;
+                _centroidMatrices[i] = Matrix4x4.TRS(_centroids[i], Quaternion.identity, Vector3.one * pointScale);
+            }
+        }
     }
 
     public static void CreatePointMesh() {
