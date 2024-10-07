@@ -7,11 +7,11 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
     [SerializeField]
     protected Color centroidColor = new(0.8f, 0.1f, 0.1f, 1f);
 
-    bool rendered = false;
     Texture2D voronoi;
     Rect screenReadRegion;
     ComputeBuffer centroidPositionBuffer;
     MaterialPropertyBlock pointPb, centroidPb;
+    bool movePoints = false;
 
     protected override void OnEnable() {
         Debug.Log("Enabling");
@@ -22,9 +22,6 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         CreateTextures();
         LoadBuffers();
         ConfigureRenderPass();
-        if (!validating) {
-            Render();
-        }
     }
 
     protected override void OnDisable() {
@@ -32,12 +29,32 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         centroidPositionBuffer?.Release();
         centroidPositionBuffer = null;
         voronoi = null;
-        rendered = false;
+    }
+    
+    // TODO: Camera isn't rendering so onPre and onPost render methds don't get called
+    protected void OnPreRender() {
+        Render();
+    }
+
+    protected void OnPostRender() {
+        if (movePoints) {
+            Debug.Log("Moving points");
+            data.MovePoints();
+            positionBuffer.SetData(data.ConeMatrices);
+            pointPositionBuffer.SetData(data.PointMatrices);
+            // Voronoi Material
+            material.SetBuffer(positionBufferId, positionBuffer);
+
+            // Point & Centroid Material
+            pointPb.SetBuffer(positionBufferId, pointPositionBuffer);
+            centroidPb.SetBuffer(positionBufferId, centroidPositionBuffer);
+            movePoints = false;
+        }
     }
 
     protected override void Update() {
-        if (!rendered) {
-            Render();
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            movePoints = true;
         }
 
         if (Input.GetKeyDown(KeyCode.S)) {
@@ -45,9 +62,7 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
             Texture2D texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
                 filterMode = FilterMode.Point,
             };
-            RenderTexture.active = rt;
-            texture.ReadPixels(screenReadRegion, 0, 0);
-            RenderTexture.active = null;
+            texture.ReadPixels(screenReadRegion, 0, 0, false);
             System.IO.File.WriteAllBytes("./Documents/centroid-voronoi-diagram.png", texture.EncodeToPNG());
         }
     }
@@ -57,21 +72,16 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         data.UpdateCentroids(voronoi, cam);
         centroidPositionBuffer.SetData(data.CentroidMatrices);
         RenderToTexture();
-        rendered = true;
     }
 
     protected void PrerenderTexture() {
         Debug.Log("Prerendering texture");
-        cam.targetTexture = rt;
-        RenderTexture.active = rt;
         rp.material = material;
         rp.matProps = null;
         Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.Render();
-        voronoi.ReadPixels(screenReadRegion, 0, 0);
-        RenderTexture.active = null;
-        cam.targetTexture = null;
+        voronoi.ReadPixels(screenReadRegion, 0, 0, false);
     }
 
     protected override void RenderToTexture() {
@@ -79,8 +89,6 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
             return;
         }
         Debug.Log("Rendering to texture");
-        cam.targetTexture = rt;
-        RenderTexture.active = rt;
         rp.material = pointMaterial;
         if (showPoints) {
             rp.matProps = pointPb;
@@ -92,11 +100,8 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         }
         cam.clearFlags = CameraClearFlags.Nothing;
         cam.Render();
-        RenderTexture.active = null;
-        cam.targetTexture = null;
     }
 
-    // TODO: Update ConfigureRenderPass for property blocks.
     protected override void ConfigureRenderPass() {
         Debug.Log("Configure render pass.");
         screenReadRegion = new Rect(0, 0, rt.width, rt.height);
@@ -124,6 +129,8 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
 
     protected void CreateTextures() {
         base.CreateRenderTexture();
+        RenderTexture.active = rt;
+        cam.targetTexture = rt;
         voronoi = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
             filterMode = FilterMode.Point,
         };

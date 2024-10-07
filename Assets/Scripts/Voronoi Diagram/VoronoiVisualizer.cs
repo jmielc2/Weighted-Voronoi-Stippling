@@ -26,6 +26,9 @@ public class VoronoiVisualizer : MonoBehaviour {
                         colorBufferId = Shader.PropertyToID("_ColorBuffer"),
                         colorId = Shader.PropertyToID("_Color");
                         
+    public RenderTexture renderTexture {
+        get { return rt; }
+    }
 
     protected void OnValidate() {
         Debug.Log("Validating");
@@ -81,15 +84,9 @@ public class VoronoiVisualizer : MonoBehaviour {
             Texture2D texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
                 filterMode = FilterMode.Point,
             };
-            RenderTexture.active = rt;
             texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-            RenderTexture.active = null;
             System.IO.File.WriteAllBytes("./Documents/voronoi-diagram.png", texture.EncodeToPNG());
         }
-    }
-
-    protected virtual void OnRenderImage(RenderTexture source, RenderTexture destination) {
-        Graphics.Blit(rt, destination);
     }
 
     protected virtual void RenderToTexture() {
@@ -107,8 +104,6 @@ public class VoronoiVisualizer : MonoBehaviour {
             Graphics.RenderMeshIndirect(rp, data.PointMesh, pointArgsBuffer);
         }
         cam.Render();
-        RenderTexture.active = null;
-        cam.targetTexture = null;
     }
 
     protected virtual void ConfigureRenderPass() {
@@ -161,6 +156,7 @@ public class VoronoiVisualizer : MonoBehaviour {
         args[0].instanceCount = (uint)numRegions;
         args[0].startIndex = mesh.GetIndexStart(0);
         args[0].startInstance = 0;
+        buffer.SetData(args);
         buffer.SetData(args);
     }
 

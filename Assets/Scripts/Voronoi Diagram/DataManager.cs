@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -14,7 +13,7 @@ public class DataManager {
     
     static Mesh _pointMesh;
     static Mesh _coneMesh;
-    const float pointScale = 0.02f;
+    const float pointScale = 0.018f;
     Quaternion pointRotation = Quaternion.Euler(0f, 0f, 45f);
 
     public DataManager(int numRegions, Camera cam) {
@@ -86,14 +85,11 @@ public class DataManager {
         Color[] colors = voronoi.GetPixels();
         for (int y = 0; y < voronoi.height; y++) {
             for (int x = 0; x < voronoi.width; x++) {
-                double b = (double)colors[y * voronoi.width + x].b;
-                double i = b * numPoints + 0.5;
-                int index = Convert.ToInt32(Math.Floor(i));
+                int index = Mathf.RoundToInt(colors[y * voronoi.width + x].b * numPoints);
                 if (index >= numPoints || index < 0) {
-                    // Debug.Log($"Index {index} is outside range. i = {i}, b = {b}");
+                    // Debug.Log($"Index {index} is outside range. b = {colors[y * voronoi.width + x].b}");
                     continue;
                 }
-                // Debug.Log($"{b} => {i} => {index}");
                 if (counts[index] == 0) {
                     _centroids[index] = Vector3.zero;
                 }
@@ -106,13 +102,21 @@ public class DataManager {
         }
         for (int i = 0; i < numPoints; i++) {
             if (counts[i] == 0) {
-                // Debug.Log($"Index {i} has count of 0.");
+                continue;
             } else {
                 float scalar = 2f / counts[i];
                 _centroids[i].x = (_centroids[i].x * scalar - 1f) * cam.aspect;
                 _centroids[i].y = _centroids[i].y * scalar - 1f;
                 _centroidMatrices[i] = Matrix4x4.TRS(_centroids[i], Quaternion.identity, Vector3.one * pointScale);
             }
+        }
+    }
+
+    public void MovePoints(float amount = 1f) {
+        for (int i = 0; i< numPoints; i++) {
+            _points[i] = Vector3.MoveTowards(_points[i], _centroids[i], amount);
+            _coneMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one);
+            _pointMatrices[i] = Matrix4x4.TRS(_points[i], pointRotation, Vector3.one * pointScale);
         }
     }
 
