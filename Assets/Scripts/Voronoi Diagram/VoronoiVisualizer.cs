@@ -133,6 +133,14 @@ public class VoronoiVisualizer : MonoBehaviour {
         colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
     }
 
+    public virtual void OnPreRender() {
+
+    }
+
+    public virtual void OnPostRender() {
+
+    }
+
     protected virtual void LoadBuffers() {
         Debug.Log("Loading buffers.");
         // Load Command Buffer

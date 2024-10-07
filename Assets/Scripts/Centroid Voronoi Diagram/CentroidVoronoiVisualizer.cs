@@ -31,12 +31,11 @@ public class CentroidVoronoiGenerator : VoronoiVisualizer {
         voronoi = null;
     }
     
-    // TODO: Camera isn't rendering so onPre and onPost render methds don't get called
-    protected void OnPreRender() {
+    public override void OnPreRender() {
         Render();
     }
 
-    protected void OnPostRender() {
+    public override void OnPostRender() {
         if (movePoints) {
             Debug.Log("Moving points");
             data.MovePoints();

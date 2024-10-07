@@ -10,7 +10,15 @@ public class DummyCamera : MonoBehaviour {
         cam = GetComponent<Camera>();
     }
 
+    private void OnPreRender() {
+        visualizer.OnPreRender();
+    }
+
     private void OnRenderImage(RenderTexture source, RenderTexture destination) {
         Graphics.Blit(visualizer.renderTexture, destination);
+    }
+
+    private void OnPostRender() {
+        visualizer.OnPostRender();
     }
 }
