@@ -7,6 +7,7 @@ public class DelauneyTest : MonoBehaviour {
     Vector2[] generators;
     Vector3[] voronois;
     Vector3[] centroids;
+    Color[] pixels;
     Camera cam;
     float width, height;
     Voronator voronator;
@@ -30,6 +31,7 @@ public class DelauneyTest : MonoBehaviour {
         if (cam == null) {
             return;
         }
+        pixels = stippleImage.GetPixels();
         float imageAspect = stippleImage.width / (float)stippleImage.height;
         if (imageAspect > cam.aspect) {
             width = cam.aspect;
@@ -70,6 +72,7 @@ public class DelauneyTest : MonoBehaviour {
                 continue;
             }
             centroids[i] = CalcCentroid(region).ToVector3();
+            // centroids[i] = CalcWeightedCentroid(region).ToVector3();
             for (int j = 0; j < region.Count; j++) {
                 voronoisList.Add(region[j]);
                 if (j == region.Count - 1) {
@@ -108,6 +111,38 @@ public class DelauneyTest : MonoBehaviour {
         );
     }
 
+    private Vector2 CalcWeightedCentroid(List<Vector2> region) {
+        Vector2 origin = region[0];
+        float totalArea = 0f;
+        float centroidX = 0f;
+        float centroidY = 0f;
+        Vector2 a = Vector2.zero;
+        Vector2 b = Vector2.zero;
+        // Debug.Log("Reading:")
+        // Calculate weighted average of centroids of subregions
+        for (int i = 1; i < region.Count - 1; i++) {
+            a.x = region[i].x - origin.x;
+            a.y = region[i].y - origin.y;
+            b.x = region[i + 1].x - origin.x;
+            b.y = region[i + 1].y - origin.y;
+            float area = Mathf.Abs(a.x * b.y - b.x * a.y) * 0.5f;
+            float x = (a.x + b.x) / 3f;
+            float y = (a.y + b.y) / 3f;
+            int posX = (int)Mathf.Floor((origin.x + x + width) * 0.5f * (1f / width) * (stippleImage.width - 1));
+            int posY = (int)Mathf.Floor((origin.y + y + height) * 0.5f * (1f / height) * (stippleImage.height - 1));
+            // Debug.Log($"({posX}, {posY})");
+            Color color = pixels[posY * stippleImage.width + posX];
+            float weight = color.r * 0.299f + color.g * 0.587f + color.b * 0.114f;
+            totalArea += area * (1f - weight);
+            centroidX += area * x * (1f - weight);
+            centroidY += area * y * (1f - weight);
+        }
+        return new Vector2(
+            (centroidX / totalArea) + origin.x,
+            (centroidY / totalArea) + origin.y
+        );
+    }
+
     void Update() {
         for (int i = 0; i < generators.Length; i++) {
             generators[i] = centroids[i].ToVector2();
@@ -131,7 +166,7 @@ public class DelauneyTest : MonoBehaviour {
         if (showCentroids && centroids != null) {
             Gizmos.color = Color.black;
             foreach(Vector2 centroid in centroids) {
-                Gizmos.DrawSphere(centroid, 0.005f);
+                Gizmos.DrawSphere(centroid, 0.05f);
             }
         }
     }
