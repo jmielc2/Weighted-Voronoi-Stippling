@@ -301,10 +301,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d5207630d53428478fa6c3ead2efc04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  numGenerators: 100
-  showDelauney: 0
+  numGenerators: 4
+  showDelauney: 1
   showVoronoi: 1
-  showCentroids: 1
+  showCentroids: 0
 --- !u!1 &1946571355
 GameObject:
   m_ObjectHideFlags: 0
