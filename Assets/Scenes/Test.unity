@@ -301,9 +301,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d5207630d53428478fa6c3ead2efc04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  numGenerators: 20000
+  stippleImage: {fileID: 2800000, guid: 04a6121a150df4e148157452bc6f9ab1, type: 3}
+  numGenerators: 10000
   showGenerators: 0
-  showVoronoi: 0
+  showVoronoi: 1
   showCentroids: 1
 --- !u!1 &1946571355
 GameObject:

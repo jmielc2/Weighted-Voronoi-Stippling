@@ -8,8 +8,11 @@ public class DelauneyTest : MonoBehaviour {
     Vector3[] voronois;
     Vector3[] centroids;
     Camera cam;
+    float width, height;
     Voronator voronator;
 
+    [SerializeField]
+    Texture2D stippleImage;
     [SerializeField, Range(1, 20000)]
     int numGenerators = 100;
     [SerializeField]
@@ -27,23 +30,36 @@ public class DelauneyTest : MonoBehaviour {
         if (cam == null) {
             return;
         }
-        generators = new Vector2[numGenerators];
-        centroids = new Vector3[numGenerators];
-        for (int i = 0; i < numGenerators; i++) {
-            generators[i] = new (
-                Random.Range(-cam.aspect, cam.aspect),
-                Random.Range(-1f, 1f)
-            );
+        float imageAspect = stippleImage.width / (float)stippleImage.height;
+        if (imageAspect > cam.aspect) {
+            width = cam.aspect;
+            height = cam.aspect * (1f / imageAspect);
+        } else {
+            width = imageAspect;
+            height = 1f;
         }
-        CalcDelauney(generators);
+        width += 0.01f;
+        height += 0.01f;
+        if (generators == null || generators.Length != numGenerators) {
+            generators = new Vector2[numGenerators];
+            centroids = new Vector3[numGenerators];
+            for (int i = 0; i < numGenerators; i++) {
+                generators[i] = new (
+                    Random.Range(-width, width),
+                    Random.Range(-height, height)
+                );
+            }
+            
+            CalcDelauney(generators, width, height);
+        }
     }
 
-    void CalcDelauney(Vector2[] generators) {
+    void CalcDelauney(Vector2[] generators, float width, float height) {
         // Create Voronoi
         voronator = new Voronator(
             generators,
-            new Vector2(-cam.aspect - 0.02f, -1.02f),
-            new Vector2(cam.aspect + 0.02f, 1.02f)
+            new Vector2(-width - 0.02f, -height - 0.02f),
+            new Vector2(width + 0.02f, height + 0.02f)
         );
 
         // Get Voronoi Regions
@@ -73,21 +89,22 @@ public class DelauneyTest : MonoBehaviour {
         float centroidY = 0f;
         Vector2 a = Vector2.zero;
         Vector2 b = Vector2.zero;
+        // Calculate weighted average of centroids of subregions
         for (int i = 1; i < region.Count - 1; i++) {
             a.x = region[i].x - origin.x;
             a.y = region[i].y - origin.y;
             b.x = region[i + 1].x - origin.x;
             b.y = region[i + 1].y - origin.y;
-            float area = Mathf.Abs(a.x * b.y - b.x * a.y) / 2f;
-            float x = (a.x + b.x) / 3f;
-            float y = (a.y + b.y) / 3f;
+            float area = Mathf.Abs(a.x * b.y - b.x * a.y);
+            float x = a.x + b.x;
+            float y = a.y + b.y;
             totalArea += area;
             centroidX += area * x;
             centroidY += area * y;
         }
         return new Vector2(
-            (centroidX / totalArea) + origin.x,
-            (centroidY / totalArea) + origin.y
+            (centroidX / (3f * totalArea)) + origin.x,
+            (centroidY / (3f * totalArea)) + origin.y
         );
     }
 
@@ -95,7 +112,7 @@ public class DelauneyTest : MonoBehaviour {
         for (int i = 0; i < generators.Length; i++) {
             generators[i] = centroids[i].ToVector2();
         }
-        CalcDelauney(generators);
+        CalcDelauney(generators, width, height);
     }
 
     void OnDrawGizmosSelected() {
