@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using VoronatorSharp;
 
@@ -29,6 +28,7 @@ public class DelauneyTest : MonoBehaviour {
             return;
         }
         generators = new Vector2[numGenerators];
+        centroids = new Vector3[numGenerators];
         for (int i = 0; i < numGenerators; i++) {
             generators[i] = new (
                 Random.Range(-cam.aspect, cam.aspect),
@@ -42,13 +42,12 @@ public class DelauneyTest : MonoBehaviour {
         // Create Voronoi
         voronator = new Voronator(
             generators,
-            new Vector2(-cam.aspect, -1f),
-            new Vector2(cam.aspect, 1f)
+            new Vector2(-cam.aspect - 0.02f, -1.02f),
+            new Vector2(cam.aspect + 0.02f, 1.02f)
         );
 
         // Get Voronoi Regions
         List<Vector3> voronoisList = new List<Vector3>();
-        centroids = new Vector3[numGenerators];
         for (int i = 0; i < generators.Length; i++) {
             List<Vector2> region = voronator.GetClippedPolygon(i);
             if (region == null) {
@@ -68,11 +67,35 @@ public class DelauneyTest : MonoBehaviour {
     }
 
     private Vector2 CalcCentroid(List<Vector2> region) {
-        return Vector2.zero;
+        Vector2 origin = region[0];
+        float totalArea = 0f;
+        float centroidX = 0f;
+        float centroidY = 0f;
+        Vector2 a = Vector2.zero;
+        Vector2 b = Vector2.zero;
+        for (int i = 1; i < region.Count - 1; i++) {
+            a.x = region[i].x - origin.x;
+            a.y = region[i].y - origin.y;
+            b.x = region[i + 1].x - origin.x;
+            b.y = region[i + 1].y - origin.y;
+            float area = Mathf.Abs(a.x * b.y - b.x * a.y) / 2f;
+            float x = (a.x + b.x) / 3f;
+            float y = (a.y + b.y) / 3f;
+            totalArea += area;
+            centroidX += area * x;
+            centroidY += area * y;
+        }
+        return new Vector2(
+            (centroidX / totalArea) + origin.x,
+            (centroidY / totalArea) + origin.y
+        );
     }
 
     void Update() {
-
+        for (int i = 0; i < generators.Length; i++) {
+            generators[i] = centroids[i].ToVector2();
+        }
+        CalcDelauney(generators);
     }
 
     void OnDrawGizmosSelected() {
@@ -89,9 +112,9 @@ public class DelauneyTest : MonoBehaviour {
         }
 
         if (showCentroids && centroids != null) {
-            Gizmos.color = Color.green;
+            Gizmos.color = Color.black;
             foreach(Vector2 centroid in centroids) {
-                Gizmos.DrawSphere(centroid, 0.01f);
+                Gizmos.DrawSphere(centroid, 0.005f);
             }
         }
     }
