@@ -7,12 +7,14 @@ public class DelauneyTest : MonoBehaviour {
     Vector2[] generators;
     List<VoronoiRegion> voronoiRegions;
     Vector3[] centroids;
+    float[] sizes = null;
     Vector2 minBounds;
     Vector2 maxBounds;
     Color[] pixels;
     Camera cam;
     float width, height;
     Voronator voronator;
+    float minWeight;
 
     [SerializeField]
     Texture2D stippleImage;
@@ -37,6 +39,7 @@ public class DelauneyTest : MonoBehaviour {
             return;
         }
         pixels = stippleImage.GetPixels();
+        CalcMinWeight();
         float imageAspect = stippleImage.width / (float)stippleImage.height;
         if (imageAspect > cam.aspect) {
             width = cam.aspect;
@@ -52,28 +55,42 @@ public class DelauneyTest : MonoBehaviour {
         if (generators == null || generators.Length != numGenerators) {
             generators = new Vector2[numGenerators];
             centroids = new Vector3[numGenerators];
+            sizes = new float[numGenerators];
             voronoiRegions = new List<VoronoiRegion>(numGenerators);
             for (int i = 0; i < numGenerators; i++) {
                 voronoiRegions.Add(new VoronoiRegion());
                 centroids[i] = Vector2.zero;
-                // generators[i] = new Vector2(
-                //     Random.Range(-width, width),
-                //     Random.Range(-height, height)
-                // );
-                int x = 0, y = 0;
-                for (int j = 0; j < 10; j++) {
-                    x = Random.Range(0, stippleImage.width);
-                    y = Random.Range(0, stippleImage.height);
-                    if (CalcPixelWeight(x, y) >= 0.001f) {
-                        break;
-                    } 
-                }
-                Vector2 result = PixelCoordToWorldCoord(x, y);
-                generators[i] = result;
+                generators[i] = new Vector2(
+                    Random.Range(-width, width),
+                    Random.Range(-height, height)
+                );
+                // int x = 0, y = 0;
+                // for (int j = 0; j < 10; j++) {
+                //     x = Random.Range(0, stippleImage.width);
+                //     y = Random.Range(0, stippleImage.height);
+                //     if (CalcPixelWeight(x, y) >= minWeight) {
+                //         break;
+                //     } 
+                // }
+                // Vector2 result = PixelCoordToWorldCoord(x, y);
+                // generators[i] = result;
             }
             
             CalcDelauney();
         }
+    }
+
+    void CalcMinWeight() {
+        minWeight = 0f;
+        for (int x = 0; x < stippleImage.width; x++) {
+            float rowWeight = 0f;
+            for (int y = 0; y < stippleImage.height; y++) {
+                rowWeight += CalcPixelWeight(x, y);
+            }
+            rowWeight /= stippleImage.width;
+            minWeight += rowWeight;
+        }
+        minWeight /= 2f;
     }
 
     float CalcPixelWeight(int x, int y) {
@@ -90,6 +107,7 @@ public class DelauneyTest : MonoBehaviour {
             voronoiRegions[i] = new VoronoiRegion();
         }
         int currVoronoi = 0;
+        float maxMass = 0f;
         for (int x = 0; x < stippleImage.width; x++) {
             for (int y = 0; y < stippleImage.height; y++) {
                 Vector2 worldCoords = PixelCoordToWorldCoord(x, y);
@@ -99,6 +117,7 @@ public class DelauneyTest : MonoBehaviour {
                 region.centerOfMass.x += weight * worldCoords.x;
                 region.centerOfMass.y += weight * worldCoords.y;
                 region.totalMass += weight;
+                maxMass = Mathf.Max(maxMass, region.totalMass);
                 voronoiRegions[currVoronoi] = region;
             }
         }
@@ -111,7 +130,8 @@ public class DelauneyTest : MonoBehaviour {
                 continue;
             }
             VoronoiRegion regionData = voronoiRegions[i];
-            if (regionData.totalMass - 0.005f > 0f) {
+            sizes[i] = ((regionData.totalMass / maxMass) * 0.008f) + 0.002f;
+            if (regionData.totalMass - 0.01f > 0f) {
                 centroids[i].x = regionData.centerOfMass.x / regionData.totalMass;
                 centroids[i].y = regionData.centerOfMass.y / regionData.totalMass;
             } else {
@@ -161,10 +181,10 @@ public class DelauneyTest : MonoBehaviour {
     }
 
     void OnDrawGizmosSelected() {
-        if (centroids != null) {
+        if (centroids != null && sizes != null) {
             Gizmos.color = Color.black;
-            foreach(Vector2 centroid in centroids) {
-                Gizmos.DrawSphere(centroid, 0.008f);
+            for (int i = 0; i < numGenerators; i++) {
+                Gizmos.DrawSphere(centroids[i], sizes[i]);
             }
         }
     }
