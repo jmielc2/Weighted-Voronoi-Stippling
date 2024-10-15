@@ -55,6 +55,11 @@ public class DelauneyTest : MonoBehaviour {
             voronoiRegions = new List<VoronoiRegion>(numGenerators);
             for (int i = 0; i < numGenerators; i++) {
                 voronoiRegions.Add(new VoronoiRegion());
+                centroids[i] = Vector2.zero;
+                // generators[i] = new Vector2(
+                //     Random.Range(-width, width),
+                //     Random.Range(-height, height)
+                // );
                 int x = 0, y = 0;
                 for (int j = 0; j < 10; j++) {
                     x = Random.Range(0, stippleImage.width);
@@ -63,7 +68,8 @@ public class DelauneyTest : MonoBehaviour {
                         break;
                     } 
                 }
-                generators[i] = PixelCoordToWorldCoord(x, y);
+                Vector2 result = PixelCoordToWorldCoord(x, y);
+                generators[i] = result;
             }
             
             CalcDelauney();
@@ -105,7 +111,7 @@ public class DelauneyTest : MonoBehaviour {
                 continue;
             }
             VoronoiRegion regionData = voronoiRegions[i];
-            if (regionData.totalMass - 0.001f >= 0f) {
+            if (regionData.totalMass - 0.005f > 0f) {
                 centroids[i].x = regionData.centerOfMass.x / regionData.totalMass;
                 centroids[i].y = regionData.centerOfMass.y / regionData.totalMass;
             } else {
@@ -158,7 +164,7 @@ public class DelauneyTest : MonoBehaviour {
         if (centroids != null) {
             Gizmos.color = Color.black;
             foreach(Vector2 centroid in centroids) {
-                Gizmos.DrawSphere(centroid, 0.005f);
+                Gizmos.DrawSphere(centroid, 0.008f);
             }
         }
     }

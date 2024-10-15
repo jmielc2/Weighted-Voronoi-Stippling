@@ -302,7 +302,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   stippleImage: {fileID: 2800000, guid: 04a6121a150df4e148157452bc6f9ab1, type: 3}
-  numGenerators: 7500
+  numGenerators: 6000
 --- !u!1 &1946571355
 GameObject:
   m_ObjectHideFlags: 0
