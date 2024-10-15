@@ -5,8 +5,10 @@ using VoronatorSharp;
 [RequireComponent(typeof(Camera))]
 public class DelauneyTest : MonoBehaviour {
     Vector2[] generators;
-    Vector3[] voronois;
+    List<VoronoiRegion> voronoiRegions;
     Vector3[] centroids;
+    Vector2 minBounds;
+    Vector2 maxBounds;
     Color[] pixels;
     Camera cam;
     float width, height;
@@ -16,8 +18,11 @@ public class DelauneyTest : MonoBehaviour {
     Texture2D stippleImage;
     [SerializeField, Range(1, 20000)]
     int numGenerators = 100;
-    [SerializeField]
-    bool showGenerators = false, showVoronoi = true, showCentroids = false;
+
+    private struct VoronoiRegion {
+        public Vector2 centerOfMass;
+        public float totalMass;
+    }
 
     void Awake() {
         cam = GetComponent<Camera>();
@@ -42,47 +47,71 @@ public class DelauneyTest : MonoBehaviour {
         }
         width += 0.01f;
         height += 0.01f;
+        minBounds = new Vector2(-width - 0.02f, -height - 0.02f);
+        maxBounds = new Vector2(width + 0.02f, height + 0.02f);
         if (generators == null || generators.Length != numGenerators) {
             generators = new Vector2[numGenerators];
             centroids = new Vector3[numGenerators];
+            voronoiRegions = new List<VoronoiRegion>(numGenerators);
             for (int i = 0; i < numGenerators; i++) {
-                generators[i] = new (
-                    Random.Range(-width, width),
-                    Random.Range(-height, height)
-                );
+                voronoiRegions.Add(new VoronoiRegion());
+                int x = 0, y = 0;
+                for (int j = 0; j < 10; j++) {
+                    x = Random.Range(0, stippleImage.width);
+                    y = Random.Range(0, stippleImage.height);
+                    if (CalcPixelWeight(x, y) >= 0.001f) {
+                        break;
+                    } 
+                }
+                generators[i] = PixelCoordToWorldCoord(x, y);
             }
             
-            CalcDelauney(generators, width, height);
+            CalcDelauney();
         }
     }
 
-    void CalcDelauney(Vector2[] generators, float width, float height) {
-        // Create Voronoi
-        voronator = new Voronator(
-            generators,
-            new Vector2(-width - 0.02f, -height - 0.02f),
-            new Vector2(width + 0.02f, height + 0.02f)
-        );
+    float CalcPixelWeight(int x, int y) {
+        Color pixel = pixels[y * stippleImage.width + x];
+        return 1f - ((pixel.r * 0.299f) + (pixel.g * 0.587f) + (pixel.b * 0.114f));
+    }
 
-        // Get Voronoi Regions
-        List<Vector3> voronoisList = new List<Vector3>();
-        for (int i = 0; i < generators.Length; i++) {
-            List<Vector2> region = voronator.GetClippedPolygon(i);
-            if (region == null) {
-                continue;
-            }
-            centroids[i] = CalcCentroid(region).ToVector3();
-            // centroids[i] = CalcWeightedCentroid(region).ToVector3();
-            for (int j = 0; j < region.Count; j++) {
-                voronoisList.Add(region[j]);
-                if (j == region.Count - 1) {
-                    voronoisList.Add(region[0]);
-                } else {
-                    voronoisList.Add(region[j + 1]);
-                }
+    void CalcDelauney() {
+        // Create Voronoi
+        voronator = new Voronator(generators, minBounds, maxBounds);
+
+        // Prepare Weighted Centroid Data
+        for (int i = 0; i < numGenerators; i++) {
+            voronoiRegions[i] = new VoronoiRegion();
+        }
+        int currVoronoi = 0;
+        for (int x = 0; x < stippleImage.width; x++) {
+            for (int y = 0; y < stippleImage.height; y++) {
+                Vector2 worldCoords = PixelCoordToWorldCoord(x, y);
+                currVoronoi = voronator.Find(worldCoords, currVoronoi);
+                float weight = CalcPixelWeight(x, y);
+                VoronoiRegion region = voronoiRegions[currVoronoi];
+                region.centerOfMass.x += weight * worldCoords.x;
+                region.centerOfMass.y += weight * worldCoords.y;
+                region.totalMass += weight;
+                voronoiRegions[currVoronoi] = region;
             }
         }
-        voronois = voronoisList.ToArray();
+
+        // Calc Voronoi Weighted Centroids
+        for (int i = 0; i < numGenerators; i++) {
+            // Calculate Voronoi Weighted Centroid
+            List<Vector2> regionPoints = voronator.GetClippedPolygon(i);
+            if (regionPoints == null) {
+                continue;
+            }
+            VoronoiRegion regionData = voronoiRegions[i];
+            if (regionData.totalMass - 0.001f >= 0f) {
+                centroids[i].x = regionData.centerOfMass.x / regionData.totalMass;
+                centroids[i].y = regionData.centerOfMass.y / regionData.totalMass;
+            } else {
+                centroids[i] = CalcCentroid(regionPoints).ToVector3();
+            }
+        }
     }
 
     private Vector2 CalcCentroid(List<Vector2> region) {
@@ -111,62 +140,25 @@ public class DelauneyTest : MonoBehaviour {
         );
     }
 
-    private Vector2 CalcWeightedCentroid(List<Vector2> region) {
-        Vector2 origin = region[0];
-        float totalArea = 0f;
-        float centroidX = 0f;
-        float centroidY = 0f;
-        Vector2 a = Vector2.zero;
-        Vector2 b = Vector2.zero;
-        // Debug.Log("Reading:")
-        // Calculate weighted average of centroids of subregions
-        for (int i = 1; i < region.Count - 1; i++) {
-            a.x = region[i].x - origin.x;
-            a.y = region[i].y - origin.y;
-            b.x = region[i + 1].x - origin.x;
-            b.y = region[i + 1].y - origin.y;
-            float area = Mathf.Abs(a.x * b.y - b.x * a.y) * 0.5f;
-            float x = (a.x + b.x) / 3f;
-            float y = (a.y + b.y) / 3f;
-            int posX = (int)Mathf.Floor((origin.x + x + width) * 0.5f * (1f / width) * (stippleImage.width - 1));
-            int posY = (int)Mathf.Floor((origin.y + y + height) * 0.5f * (1f / height) * (stippleImage.height - 1));
-            // Debug.Log($"({posX}, {posY})");
-            Color color = pixels[posY * stippleImage.width + posX];
-            float weight = color.r * 0.299f + color.g * 0.587f + color.b * 0.114f;
-            totalArea += area * (1f - weight);
-            centroidX += area * x * (1f - weight);
-            centroidY += area * y * (1f - weight);
-        }
-        return new Vector2(
-            (centroidX / totalArea) + origin.x,
-            (centroidY / totalArea) + origin.y
-        );
+    Vector2 PixelCoordToWorldCoord(int x, int y) {
+        Vector2 worldCoord = Vector2.zero;
+        worldCoord.x = (((x + 0.5f) / (stippleImage.width * 0.5f)) - 1f) * width;
+        worldCoord.y = (((y + 0.5f) / (stippleImage.height * 0.5f)) - 1f) * height;
+        return worldCoord;
     }
 
     void Update() {
         for (int i = 0; i < generators.Length; i++) {
             generators[i] = centroids[i].ToVector2();
         }
-        CalcDelauney(generators, width, height);
+        CalcDelauney();
     }
 
     void OnDrawGizmosSelected() {
-        if (showGenerators && generators != null) {
-            Gizmos.color = Color.magenta;
-            foreach(Vector2 generator in generators) {
-                Gizmos.DrawSphere(generator.ToVector3(), 0.01f);
-            }
-        }
-
-        if (showVoronoi && voronois != null) {
-            Gizmos.color = Color.blue;
-            Gizmos.DrawLineList(voronois);
-        }
-
-        if (showCentroids && centroids != null) {
+        if (centroids != null) {
             Gizmos.color = Color.black;
             foreach(Vector2 centroid in centroids) {
-                Gizmos.DrawSphere(centroid, 0.05f);
+                Gizmos.DrawSphere(centroid, 0.005f);
             }
         }
     }
