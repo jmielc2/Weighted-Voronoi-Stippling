@@ -32,9 +32,6 @@ void GatherData(uint3 id : SV_DispatchThreadID) {
     InterlockedAdd(_VoronoiData[voronoiId].totalMass, 1);
     InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.x, id.x);
     InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.y, id.y);
-    // float2 worldCoord = PixelToWorldCoord(id.x, id.y);
-    // _VoronoiData[voronoiId].totalMass += 1;
-    // _VoronoiData[voronoiId].centerOfMass += worldCoord;
 }
 
 [numthreads(64, 1, 1)]
