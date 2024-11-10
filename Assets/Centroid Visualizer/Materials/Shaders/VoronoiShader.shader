@@ -1,8 +1,5 @@
 Shader "Centroid Visualizer/Voronoi Shader" {
     SubShader {
-        Tags { "RenderType"="Opaque" }
-        LOD 100
-
         Pass {
             CGPROGRAM
             #pragma vertex vert
@@ -44,3 +41,4 @@ Shader "Centroid Visualizer/Voronoi Shader" {
         }
     }
 }
+

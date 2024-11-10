@@ -96,6 +96,7 @@ namespace CentroidVisualizer {
             triangles[((numSlices - 1) * 3) + 2] = 1;
             _coneMesh.SetVertices(vertices);
             _coneMesh.SetTriangles(triangles, 0, true, 0);
+            Debug.Log($"Cone Vertices Length: {vertices.Length}");
         }
     }
 }

@@ -91,9 +91,7 @@ namespace CentroidVisualizer {
                 return;
             }
             // Create Voronoi Diagram
-            cam.targetTexture = rt;
-            RenderTexture.active = rt;
-            rp.material = material;
+            
             Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
             cam.Render();
 
@@ -123,6 +121,9 @@ namespace CentroidVisualizer {
                 worldBounds = renderBounds,
                 shadowCastingMode = ShadowCastingMode.Off
             };
+            cam.targetTexture = rt;
+            RenderTexture.active = rt;
+            rp.material = material;
         }
 
         protected virtual void CreateBuffers() {
@@ -177,7 +178,7 @@ namespace CentroidVisualizer {
             if (rt != null) {
                 DestroyRenderTexture();
             }
-            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth / 2, cam.pixelHeight / 2, RenderTextureFormat.ARGBFloat) {
+            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
                 depthBufferBits = 32,
                 useMipMap = false
             };
