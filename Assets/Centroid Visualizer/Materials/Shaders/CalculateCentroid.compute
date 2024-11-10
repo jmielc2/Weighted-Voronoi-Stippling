@@ -17,8 +17,8 @@ float _Width, _Height;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
-        (((pixel.x + 0.5) / (_ImageWidth * 0.5)) - 1) * _Width * 0.5,
-        (((pixel.y + 0.5) / (_ImageHeight * 0.5)) - 1) * _Height * 0.5
+        (((pixel.x + 0.5) / _ImageWidth) - 0.5) * _Width,
+        (((pixel.y + 0.5) / _ImageHeight) - 0.5) * _Height
     );
 }
 
@@ -39,20 +39,19 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
     if (id.x >= _NumRegions) {
         return;
     }
-    float4x4 positionMatrix = _PositionMatrixBuffer[id.x];
-    float4 position = positionMatrix._m03_m13_m23_m33;
+    float2 position = _PositionMatrixBuffer[id.x]._m03_m13;
     
     // Update position here
-    float2 centerOfMass = _VoronoiData[id.x].centerOfMass;
-    float totalMass = _VoronoiData[id.x].totalMass;
+    VoronoiRegion region = _VoronoiData[id.x];
+    float2 centerOfMass = region.centerOfMass;
+    float totalMass = region.totalMass;
     if (totalMass != 0) {
         centerOfMass /= totalMass;
         position.xy = PixelToWorldCoord(centerOfMass);
     }
+    _PositionMatrixBuffer[id.x]._m03_m13 = position;
     
-    positionMatrix._m03_m13_m23_m33 = position;
-    _PositionMatrixBuffer[id.x] = positionMatrix;
-    
-    _VoronoiData[id.x].centerOfMass = float2(0, 0);
-    _VoronoiData[id.x].totalMass = 0;
+    region.centerOfMass = float2(0, 0);
+    region.totalMass = 0;
+    _VoronoiData[id.x] = region;
 }

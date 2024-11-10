@@ -85,15 +85,6 @@ namespace CentroidVisualizer {
                 return;
             }
             RenderCentroid();
-                        
-            if (Input.GetKeyDown(KeyCode.S)) {
-                Debug.Log("Writing texture to file.");
-                Texture2D texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
-                    filterMode = FilterMode.Point,
-                };
-                texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-                System.IO.File.WriteAllBytes("./Documents/centroid-diagram.png", texture.EncodeToPNG());
-            }
         }
 
         protected virtual void RenderCentroid() {
@@ -101,7 +92,6 @@ namespace CentroidVisualizer {
                 return;
             }
             // Create Voronoi Diagram
-            Debug.Log("Rendering to texture");
             cam.targetTexture = rt;
             RenderTexture.active = rt;
             rp.material = material;
