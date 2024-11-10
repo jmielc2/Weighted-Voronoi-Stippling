@@ -1,0 +1,61 @@
+#pragma target 4.5
+#pragma kernel CalculateCentroid
+#pragma kernel GatherData
+
+struct VoronoiRegion
+{
+    int2 centerOfMass;
+    int totalMass;
+};
+
+Texture2D _VoronoiDiagram;
+RWStructuredBuffer<VoronoiRegion> _VoronoiData;
+RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
+uint _NumRegions;
+uint _ImageWidth, _ImageHeight;
+float _Width, _Height;
+
+float2 PixelToWorldCoord(float2 pixel) {
+    return float2(
+        (((pixel.x + 0.5) / (_ImageWidth * 0.5)) - 1) * _Width,
+        (((pixel.y + 0.5) / (_ImageHeight * 0.5)) - 1) * _Height
+    );
+}
+
+[numthreads(8, 8, 1)]
+void GatherData(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= _ImageWidth || id.y >= _ImageHeight) {
+        return;
+    }
+    float4 color = _VoronoiDiagram[id.xy];
+    int voronoiId = floor(color.x * _NumRegions + 0.5);
+    InterlockedAdd(_VoronoiData[voronoiId].totalMass, 1);
+    InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.x, id.x);
+    InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.y, id.y);
+    // float2 worldCoord = PixelToWorldCoord(id.x, id.y);
+    // _VoronoiData[voronoiId].totalMass += 1;
+    // _VoronoiData[voronoiId].centerOfMass += worldCoord;
+}
+
+[numthreads(64, 1, 1)]
+void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= _NumRegions) {
+        return;
+    }
+    float4x4 positionMatrix = _PositionMatrixBuffer[id.x];
+    float4 position = positionMatrix._m03_m13_m23_m33;
+    
+    // Update position here
+    float2 centerOfMass = _VoronoiData[id.x].centerOfMass;
+    float totalMass = _VoronoiData[id.x].totalMass;
+    if (totalMass != 0) {
+        centerOfMass /= totalMass;
+        position.xy = PixelToWorldCoord(centerOfMass);
+    }
+    
+    positionMatrix._m03_m13_m23_m33 = position;
+    _PositionMatrixBuffer[id.x] = positionMatrix;
+    
+    _VoronoiData[id.x].centerOfMass = float2(0, 0);
+    _VoronoiData[id.x].totalMass = 0;
+}

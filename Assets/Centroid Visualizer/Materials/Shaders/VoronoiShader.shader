@@ -1,8 +1,4 @@
-Shader "Unlit/Indirect Point Shader" {
-    Properties {
-        _Color ("Color", Vector) = (0, 0, 0, 1)
-    }
-
+Shader "Centroid Visualizer/Voronoi Shader" {
     SubShader {
         Tags { "RenderType"="Opaque" }
         LOD 100
@@ -23,22 +19,27 @@ Shader "Unlit/Indirect Point Shader" {
 
             struct v2f {
                 float4 vertex : SV_POSITION;
+                uint instanceID : SV_InstanceID;
             };
 
-            StructuredBuffer<float4x4> _PositionMatrixBuffer;
-            float4 _Color;
 
-            v2f vert (appdata v) {
+            StructuredBuffer<float4x4> _PositionMatrixBuffer;
+            StructuredBuffer<float3> _ColorBuffer;
+
+            v2f vert(appdata v) {
                 InitIndirectDrawArgs(0);
+                uint id = GetIndirectInstanceID(v.instanceID);
                 v2f o;
-                o.vertex = mul(_PositionMatrixBuffer[v.instanceID], v.vertex);
+                o.instanceID = id;
+                o.vertex = mul(_PositionMatrixBuffer[id], v.vertex);
                 o.vertex = UnityObjectToClipPos(o.vertex);
                 return o;
             }
 
-            float4 frag (v2f i) : SV_Target {
-                return _Color;
+            float4 frag(v2f i) : SV_Target {
+                return float4(_ColorBuffer[i.instanceID], 1);
             }
+
             ENDCG
         }
     }

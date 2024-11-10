@@ -18,10 +18,10 @@ namespace VoronoiVisualizer {
         protected Bounds renderBounds;
         protected RenderTexture rt;
         protected bool validating = false;
+        protected bool canPlay = true;
 
         protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
-                            colorBufferId = Shader.PropertyToID("_ColorBuffer"),
-                            colorId = Shader.PropertyToID("_Color");
+                            colorBufferId = Shader.PropertyToID("_ColorBuffer");
                             
         public RenderTexture renderTexture {
             get => rt;
@@ -39,6 +39,10 @@ namespace VoronoiVisualizer {
 
         protected virtual void Awake() {
             Debug.Log("Awake");
+            canPlay = RequirementCheck();
+            if (!canPlay) {
+                Debug.Log("Requirements not met.");
+            }
             cam = GetComponent<Camera>();
             renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
         }
@@ -66,6 +70,9 @@ namespace VoronoiVisualizer {
         }
 
         protected virtual void Update() {
+            if (!canPlay) {
+                return;
+            }
             if (rt == null) {
                 RenderToTexture();
             }
@@ -150,6 +157,10 @@ namespace VoronoiVisualizer {
         protected virtual void DestroyRenderTexture() {
             rt?.Release();
             rt = null;
+        }
+
+        protected bool RequirementCheck() {
+            return SystemInfo.SupportsTextureFormat(TextureFormat.RGBAFloat);
         }
     }
 }
