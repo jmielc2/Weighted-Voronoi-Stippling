@@ -17,7 +17,7 @@ namespace CentroidVisualizer {
         }
 
         private void OnRenderImage(RenderTexture source, RenderTexture destination) {
-            RenderTexture rt = generator.renderTexture;
+            RenderTexture rt = generator.RenderTexture;
             Graphics.Blit(rt, destination);
             
             if (captureFrame) {

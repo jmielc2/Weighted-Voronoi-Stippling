@@ -31,7 +31,7 @@ namespace CentroidVisualizer {
                             widthId = Shader.PropertyToID("_Width"),
                             heightId = Shader.PropertyToID("_Height");
 
-        public RenderTexture renderTexture {
+        public RenderTexture RenderTexture {
             get => rt;
         }
 
@@ -64,7 +64,6 @@ namespace CentroidVisualizer {
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
-            // RenderCentroid();
         }
 
         protected virtual void OnDisable() {
@@ -178,7 +177,7 @@ namespace CentroidVisualizer {
             if (rt != null) {
                 DestroyRenderTexture();
             }
-            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
+            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth / 2, cam.pixelHeight / 2, RenderTextureFormat.ARGBFloat) {
                 depthBufferBits = 32,
                 useMipMap = false
             };
