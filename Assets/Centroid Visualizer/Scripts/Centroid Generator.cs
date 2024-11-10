@@ -158,7 +158,7 @@ namespace CentroidVisualizer {
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, rt.width);
             centroidCalculator.SetInt(imageHeightId, rt.height);
-            centroidCalculator.SetFloat(widthId, cam.aspect);
+            centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
 
             // Set compute shader data needed to gather voronoi data

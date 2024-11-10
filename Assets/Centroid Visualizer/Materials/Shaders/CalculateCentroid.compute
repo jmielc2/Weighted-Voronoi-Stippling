@@ -17,8 +17,8 @@ float _Width, _Height;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
-        (((pixel.x + 0.5) / (_ImageWidth * 0.5)) - 1) * _Width,
-        (((pixel.y + 0.5) / (_ImageHeight * 0.5)) - 1) * _Height
+        (((pixel.x + 0.5) / (_ImageWidth * 0.5)) - 1) * _Width * 0.5,
+        (((pixel.y + 0.5) / (_ImageHeight * 0.5)) - 1) * _Height * 0.5
     );
 }
 
