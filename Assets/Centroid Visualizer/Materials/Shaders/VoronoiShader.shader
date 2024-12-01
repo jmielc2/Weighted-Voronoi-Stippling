@@ -11,12 +11,12 @@ Shader "Centroid Visualizer/Voronoi Shader" {
 
             struct appdata {
                 float4 vertex : POSITION;
-                float3 color: COLOR;
+                float color: COLOR;
             };
 
             struct v2f {
                 float4 vertex : SV_POSITION;
-                float3 color : COLOR;
+                float color : COLOR;
             };
 
             StructuredBuffer<float2> _ColorBuffer;
@@ -24,7 +24,7 @@ Shader "Centroid Visualizer/Voronoi Shader" {
 
             v2f vert(appdata v) {
                 v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.vertex = mul(UNITY_MATRIX_VP, v.vertex);
                 o.color = v.color;
                 return o;
             }
@@ -32,7 +32,8 @@ Shader "Centroid Visualizer/Voronoi Shader" {
             float4 frag(v2f i) : SV_Target {
                 // uint id = min(floor(i.color.x * _NumRegions - 1), _NumRegions - 1);
                 // return float4(i.color.x, _ColorBuffer[id].xy, 1);
-                return float4(i.color, 1);
+                int index = min(floor(i.color * _NumRegions), _NumRegions - 1);
+                return float4(i.color, _ColorBuffer[index].xy, 1);
             }
 
             ENDCG

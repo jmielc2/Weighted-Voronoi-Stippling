@@ -27,6 +27,10 @@ namespace CentroidVisualizer {
             GenerateRandomPoints(cam);
         }
 
+        ~DataManager() {
+            _coneMesh?.Clear();
+        }
+
         public int NumPoints {
             get { return numPoints; }
         }
@@ -54,8 +58,7 @@ namespace CentroidVisualizer {
                 //point.x = Random.Range(-1f, 1f) * cam.aspect;
                 //point.y = Random.Range(-1f, 1f);
                 //_coneMatrices[i] = Matrix4x4.TRS(point, Quaternion.identity, Vector3.one);
-                point.x =  (i / (float)numPoints) * cam.aspect;
-                Debug.Log(point.x);
+                point.x = (((i / (float)numPoints) * 2f) - 1f) * cam.aspect;
                 _coneMatrices[i] = Matrix4x4.TRS(point, Quaternion.identity, Vector3.one);
             }
         }
@@ -78,7 +81,7 @@ namespace CentroidVisualizer {
             } ;
 
             // Calculate Minimum Number of Cone Slices
-            float radius = Mathf.Sqrt(cam.pixelWidth * cam.pixelWidth + cam.pixelHeight * cam.pixelHeight);
+            float radius = Mathf.Sqrt((cam.pixelWidth * cam.pixelWidth) + (cam.pixelHeight * cam.pixelHeight));
             float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius);
             int numSlices = Mathf.CeilToInt((2f * Mathf.PI) / maxAngle);
 
@@ -88,7 +91,7 @@ namespace CentroidVisualizer {
             vertices[0] = Vector3.zero;
             float angle = 0f;
             float width = cam.aspect * 2f;
-            radius = Mathf.Sqrt(width * width + 4);
+            radius = Mathf.Sqrt(width * width + 4) * 0.2f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,
@@ -103,13 +106,19 @@ namespace CentroidVisualizer {
                 triangles[(i * 3) + 2] = i + 1;
             }
             triangles[((numSlices - 1) * 3) + 2] = 1;
+            Debug.Log($"Cone Triangles: {triangles.Length}");
+            Debug.Log($"Cone Vertices: {vertices.Length}");
+            _coneMesh.vertices = vertices;
+            _coneMesh.SetIndices(triangles, MeshTopology.Triangles, 0);
             _coneMesh.SetVertexBufferParams(vertices.Length, attributes);
             _coneMesh.SetIndexBufferParams(triangles.Length, IndexFormat.UInt32);
+            
+            _coneMesh.SetVertexBufferData(vertices, 0, 0, vertices.Length);
+            _coneMesh.SetIndexBufferData(triangles, 0, 0, triangles.Length);
+
             _coneMesh.SetSubMesh(
                 0, new SubMeshDescriptor(0, triangles.Length, MeshTopology.Triangles), MeshUpdateFlags.DontRecalculateBounds
             );
-            _coneMesh.SetVertexBufferData(vertices, 0, 0, vertices.Length);
-            _coneMesh.SetIndexBufferData(triangles, 0, 0, triangles.Length);
         }
     }
 }
