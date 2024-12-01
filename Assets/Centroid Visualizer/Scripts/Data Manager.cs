@@ -55,10 +55,8 @@ namespace CentroidVisualizer {
             Vector3 point = Vector3.zero;
             for(int i = 0; i < numPoints; i++) {
                 // Calculate Cone Matrix
-                //point.x = Random.Range(-1f, 1f) * cam.aspect;
-                //point.y = Random.Range(-1f, 1f);
-                //_coneMatrices[i] = Matrix4x4.TRS(point, Quaternion.identity, Vector3.one);
-                point.x = (((i / (float)numPoints) * 2f) - 1f) * cam.aspect;
+                point.x = Random.Range(-1f, 1f) * cam.aspect;
+                point.y = Random.Range(-1f, 1f);
                 _coneMatrices[i] = Matrix4x4.TRS(point, Quaternion.identity, Vector3.one);
             }
         }
@@ -91,7 +89,7 @@ namespace CentroidVisualizer {
             vertices[0] = Vector3.zero;
             float angle = 0f;
             float width = cam.aspect * 2f;
-            radius = Mathf.Sqrt(width * width + 4) * 0.2f;
+            radius = Mathf.Sqrt(width * width + 4);
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,

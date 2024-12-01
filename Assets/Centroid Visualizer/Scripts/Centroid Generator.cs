@@ -10,9 +10,6 @@ namespace CentroidVisualizer {
         [SerializeField]
         protected ComputeShader centroidCalculator;
 
-        [SerializeField]
-        protected Mesh coneMesh;
-
         // Private Member Variables
         protected Camera cam;
         protected DataManager data;
@@ -22,7 +19,6 @@ namespace CentroidVisualizer {
         protected RenderTexture rt = null;
         protected bool validating = false;
         protected bool canPlay = true;
-        [SerializeField]
         protected Mesh voronoiMesh;
 
         protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
@@ -70,7 +66,6 @@ namespace CentroidVisualizer {
             Debug.Log("Enabling");
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, cam);
-                coneMesh = data.ConeMesh;
             }
             rt = CreateRenderTexture();
             CreateBuffers();
@@ -116,17 +111,17 @@ namespace CentroidVisualizer {
             cam.Render();
 
             // Gather Voronoi Data
-            //int numGroupsX = Mathf.CeilToInt(rt.width / 8f);
-            //int numGroupsY = Mathf.CeilToInt(rt.height / 8f);
-            //centroidCalculator.Dispatch(
-            //    centroidCalculator.FindKernel("GatherData"), numGroupsX, numGroupsY, 1
-            //);
+            int numGroupsX = Mathf.CeilToInt(rt.width / 8f);
+            int numGroupsY = Mathf.CeilToInt(rt.height / 8f);
+            centroidCalculator.Dispatch(
+                centroidCalculator.FindKernel("GatherData"), numGroupsX, numGroupsY, 1
+            );
 
             // Calculate Centroid
-            //int numGroups = Mathf.CeilToInt(numRegions / 64f);
-            //centroidCalculator.Dispatch(
-            //    centroidCalculator.FindKernel("CalculateCentroid"), numGroups, 1, 1
-            //);
+            int numGroups = Mathf.CeilToInt(numRegions / 64f);
+            centroidCalculator.Dispatch(
+                centroidCalculator.FindKernel("CalculateCentroid"), numGroups, 1, 1
+            );
         }
 
         protected void ConfigureRenderPass() {
@@ -224,6 +219,7 @@ namespace CentroidVisualizer {
                 new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 4),
                 new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 1)
             };
+            Debug.Log(data.ConeMesh.vertices.Length * numRegions);
             mesh.vertexBufferTarget |= GraphicsBuffer.Target.Structured;
             mesh.indexBufferTarget |= GraphicsBuffer.Target.Structured;
             int numIndices = data.ConeMesh.triangles.Length * numRegions;
