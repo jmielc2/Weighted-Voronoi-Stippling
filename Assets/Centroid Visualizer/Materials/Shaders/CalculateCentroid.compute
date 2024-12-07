@@ -17,15 +17,15 @@ struct VertexAttributes {
 Texture2D _VoronoiDiagram;
 RWStructuredBuffer<VoronoiRegion> _VoronoiData;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
-uniform uint _NumRegions;
-uniform uint _ImageWidth, _ImageHeight;
-uniform float _Width, _Height;
+uint _NumRegions;
+uint _ImageWidth, _ImageHeight;
+float _Width, _Height;
 
 uniform StructuredBuffer<float3> _ConeMeshVertexBuffer;
 uniform StructuredBuffer<uint> _ConeMeshIndexBuffer;
 RWStructuredBuffer<VertexAttributes> _VoronoiMeshVertexBuffer;
 RWStructuredBuffer<uint> _VoronoiMeshIndexBuffer;
-uniform uint _NumConeVertices, _NumConeIndices;
+uint _NumConeVertices, _NumConeIndices;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -77,6 +77,7 @@ void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
         VertexAttributes attribute = { vPos, vId };
         _VoronoiMeshVertexBuffer[vIndex] = attribute;
     }
+    AllMemoryBarrierWithGroupSync();
 }
 
 [numthreads(1, 64, 1)]
@@ -86,5 +87,6 @@ void PopulateVoronoiMeshIndexData(uint3 id : SV_DispatchThreadID) {
         uint vInd = _ConeMeshIndexBuffer[id.y] + (_NumConeVertices * id.x);
         _VoronoiMeshIndexBuffer[vIndex] = vInd;
     }
+    AllMemoryBarrierWithGroupSync();
 }
 
