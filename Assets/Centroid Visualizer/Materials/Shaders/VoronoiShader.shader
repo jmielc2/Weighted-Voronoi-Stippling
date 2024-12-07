@@ -6,34 +6,36 @@ Shader "Centroid Visualizer/Voronoi Shader" {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma instancing_options assumeuniformscaling nolightmap
+            #pragma editor_sync_compilation
+
+            #pragma target 4.5
 
             #include "UnityCG.cginc"
 
             struct appdata {
-                float4 vertex : POSITION;
-                float color: COLOR;
+                float3 vertex : POSITION;
             };
 
             struct v2f {
                 float4 vertex : SV_POSITION;
-                float color : COLOR;
+                uint instanceID : SV_InstanceID;
             };
 
-            uniform StructuredBuffer<float2> _ColorBuffer;
-            uniform uint _NumRegions;
+            uniform StructuredBuffer<float3> _ColorBuffer;
+            uniform StructuredBuffer<float4x4> _PositionMatrixBuffer;
 
-            v2f vert(appdata v) {
+            v2f vert(appdata v, uint instanceID : SV_InstanceID) {
                 v2f o;
-                o.vertex = mul(UNITY_MATRIX_VP, v.vertex);
-                o.color = v.color;
+                float4 pos = mul(_PositionMatrixBuffer[instanceID], float4(v.vertex, 1));
+                o.vertex = mul(UNITY_MATRIX_VP, pos);
+                o.instanceID = instanceID;
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target {
-                int index = min(floor(i.color * _NumRegions), _NumRegions - 1);
-                return float4(i.color, _ColorBuffer[index].xy, 1);
+                return float4(_ColorBuffer[i.instanceID], 1);
             }
-
             ENDCG
         }
     }
