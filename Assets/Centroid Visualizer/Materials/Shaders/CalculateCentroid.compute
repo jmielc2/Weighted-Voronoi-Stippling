@@ -1,17 +1,11 @@
 #pragma target 4.5
 #pragma kernel CalculateCentroid
 #pragma kernel GatherData
-#pragma kernel PopulateVoronoiMeshVertexData
-#pragma kernel PopulateVoronoiMeshIndexData
 
-struct VoronoiRegion {
+struct VoronoiRegion
+{
     int2 centerOfMass;
     int totalMass;
-};
-
-struct VertexAttributes {
-    float3 position;
-    float3 color;
 };
 
 Texture2D _VoronoiDiagram;
@@ -20,11 +14,6 @@ RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 uint _NumRegions;
 uint _ImageWidth, _ImageHeight;
 float _Width, _Height;
-
-StructuredBuffer<float3> _ConeMeshVertexBuffer;
-StructuredBuffer<uint> _ConeMeshIndexBuffer;
-RWStructuredBuffer<VertexAttributes> _VoronoiMeshVertexBuffer;
-RWStructuredBuffer<uint> _VoronoiMeshIndexBuffer;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -66,32 +55,3 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
     region.totalMass = 0;
     _VoronoiData[id.x] = region;
 }
-
-[numthreads(1, 64, 1)]
-void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
-    uint numVertices = 0, _;
-    _ConeMeshVertexBuffer.GetDimensions(numVertices, _);
-    if (id.y >= numVertices) {
-        return;
-    }
-    int vIndex = id.x * numVertices + id.y;
-    float3 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1)).xyz;
-    float voronoiId = float(id.x) / float(_NumRegions);
-    float3 vColor = float3(voronoiId, voronoiId, voronoiId);
-    VertexAttributes attribute = { vPos, vColor };
-    _VoronoiMeshVertexBuffer[vIndex] = attribute;
-}
-
-[numthreads(1, 64, 1)]
-void PopulateVoronoiMeshIndexData(uint3 id : SV_DispatchThreadID) {
-    uint numVertices = 0, numIndices = 0, _;
-    _ConeMeshIndexBuffer.GetDimensions(numIndices, _);
-    if (id.y >= numIndices){
-        return;
-    }
-    _ConeMeshVertexBuffer.GetDimensions(numVertices, _);
-    int vIndex = id.x * numIndices + id.y;
-    uint vInd = _ConeMeshIndexBuffer[id.y] + numVertices * id.x;
-    _VoronoiMeshIndexBuffer[vIndex] = vInd;
-}
-

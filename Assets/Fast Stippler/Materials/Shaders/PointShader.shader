@@ -1,4 +1,4 @@
-Shader "Fast Stippler/Point Shader" {
+Shader "Centroid Visualizer/Point Shader" {
     Properties {
         _Color ("Color", Vector) = (0, 0, 0, 1)
     }
