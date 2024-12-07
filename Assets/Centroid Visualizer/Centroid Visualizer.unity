@@ -316,7 +316,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: 76196e07c9330466bb169ac38b1cbe14, type: 2}
-  numRegions: 10000
+  numRegions: 100
   centroidCalculator: {fileID: 7200000, guid: ada390de0e0785a428217672a9da4f26, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
