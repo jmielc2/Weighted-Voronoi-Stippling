@@ -83,7 +83,6 @@ namespace CentroidVisualizer {
             colorBuffer = null;
             voronoiData?.Release();
             voronoiData = null;
-            voronoiMesh.Clear();
             DestroyRenderTexture();
         }
 
@@ -128,6 +127,7 @@ namespace CentroidVisualizer {
         protected void ConfigureRenderPass() {
             Debug.Log("Configuring renderer.");
             // Voronoi Material
+            material.SetBuffer(positionBufferId, positionBuffer);
             material.SetBuffer(colorBufferId, colorBuffer);
             material.SetInt(numRegionsId, numRegions);
 
@@ -228,12 +228,14 @@ namespace CentroidVisualizer {
             // Creates and configures a mesh to be updated via Compute Shader then rendered in a single draw call.
             Mesh mesh = new();
             VertexAttributeDescriptor[] attributes = new[] {
-                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 4),
+                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
                 new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 3)
             };
             mesh.vertexBufferTarget |= GraphicsBuffer.Target.Structured;
             mesh.indexBufferTarget |= GraphicsBuffer.Target.Structured;
             int numIndices = data.ConeMesh.triangles.Length * numRegions;
+            Debug.Log(data.ConeMesh.vertices.Length);
+            Debug.Log(data.ConeMesh.triangles.Length);
             mesh.SetVertexBufferParams(data.ConeMesh.vertices.Length * numRegions, attributes);
             mesh.SetIndexBufferParams(numIndices, IndexFormat.UInt32);
             mesh.SetSubMesh(

@@ -10,7 +10,7 @@ struct VoronoiRegion {
 };
 
 struct VertexAttributes {
-    float4 position;
+    float3 position;
     float3 color;
 };
 
@@ -71,13 +71,13 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
 void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
     uint numVertices = 0, _;
     _ConeMeshVertexBuffer.GetDimensions(numVertices, _);
-    if (id.x >= _NumRegions || id.y >= numVertices) {
+    if (id.y >= numVertices) {
         return;
     }
     int vIndex = id.x * numVertices + id.y;
-    float4 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1));
-    float vId = float(id.x) / float(_NumRegions);
-    float3 vColor = float3(vId, vId, vId);
+    float3 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1)).xyz;
+    float voronoiId = float(id.x) / float(_NumRegions);
+    float3 vColor = float3(voronoiId, voronoiId, voronoiId);
     VertexAttributes attribute = { vPos, vColor };
     _VoronoiMeshVertexBuffer[vIndex] = attribute;
 }
@@ -86,7 +86,7 @@ void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
 void PopulateVoronoiMeshIndexData(uint3 id : SV_DispatchThreadID) {
     uint numVertices = 0, numIndices = 0, _;
     _ConeMeshIndexBuffer.GetDimensions(numIndices, _);
-    if (id.x >= _NumRegions || id.y >= numIndices){
+    if (id.y >= numIndices){
         return;
     }
     _ConeMeshVertexBuffer.GetDimensions(numVertices, _);

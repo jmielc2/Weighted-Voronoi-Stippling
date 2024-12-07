@@ -245,7 +245,7 @@ Camera:
   m_GameObject: {fileID: 1389073143}
   m_Enabled: 0
   serializedVersion: 2
-  m_ClearFlags: 2
+  m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
@@ -316,7 +316,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: 270be8d1ccaaa0a45bcb93cd337358df, type: 2}
-  numRegions: 10
+  numRegions: 5
   centroidCalculator: {fileID: 7200000, guid: ada390de0e0785a428217672a9da4f26, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
