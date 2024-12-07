@@ -11,7 +11,7 @@ struct VoronoiRegion {
 
 struct VertexAttributes {
     float4 position;
-    float color;
+    float3 color;
 };
 
 Texture2D _VoronoiDiagram;
@@ -21,11 +21,10 @@ uint _NumRegions;
 uint _ImageWidth, _ImageHeight;
 float _Width, _Height;
 
-uniform StructuredBuffer<float3> _ConeMeshVertexBuffer;
-uniform StructuredBuffer<uint> _ConeMeshIndexBuffer;
+StructuredBuffer<float3> _ConeMeshVertexBuffer;
+StructuredBuffer<uint> _ConeMeshIndexBuffer;
 RWStructuredBuffer<VertexAttributes> _VoronoiMeshVertexBuffer;
 RWStructuredBuffer<uint> _VoronoiMeshIndexBuffer;
-uint _NumConeVertices, _NumConeIndices;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -70,23 +69,29 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
 
 [numthreads(1, 64, 1)]
 void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
-    if (id.x < _NumRegions && id.y < _NumConeVertices) {
-        int vIndex = id.x * _NumConeVertices + id.y;
-        float4 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1));
-        float vId = float(id.x) / float(_NumRegions);
-        VertexAttributes attribute = { vPos, vId };
-        _VoronoiMeshVertexBuffer[vIndex] = attribute;
+    uint numVertices = 0, _;
+    _ConeMeshVertexBuffer.GetDimensions(numVertices, _);
+    if (id.x >= _NumRegions || id.y >= numVertices) {
+        return;
     }
-    AllMemoryBarrierWithGroupSync();
+    int vIndex = id.x * numVertices + id.y;
+    float4 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1));
+    float vId = float(id.x) / float(_NumRegions);
+    float3 vColor = float3(vId, vId, vId);
+    VertexAttributes attribute = { vPos, vColor };
+    _VoronoiMeshVertexBuffer[vIndex] = attribute;
 }
 
 [numthreads(1, 64, 1)]
 void PopulateVoronoiMeshIndexData(uint3 id : SV_DispatchThreadID) {
-    if (id.x < _NumRegions && id.y < _NumConeIndices) {
-        int vIndex = id.x * _NumConeIndices + id.y;
-        uint vInd = _ConeMeshIndexBuffer[id.y] + (_NumConeVertices * id.x);
-        _VoronoiMeshIndexBuffer[vIndex] = vInd;
+    uint numVertices = 0, numIndices = 0, _;
+    _ConeMeshIndexBuffer.GetDimensions(numIndices, _);
+    if (id.x >= _NumRegions || id.y >= numIndices){
+        return;
     }
-    AllMemoryBarrierWithGroupSync();
+    _ConeMeshVertexBuffer.GetDimensions(numVertices, _);
+    int vIndex = id.x * numIndices + id.y;
+    uint vInd = _ConeMeshIndexBuffer[id.y] + numVertices * id.x;
+    _VoronoiMeshIndexBuffer[vIndex] = vInd;
 }
 

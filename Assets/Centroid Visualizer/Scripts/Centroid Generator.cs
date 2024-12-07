@@ -10,19 +10,17 @@ namespace CentroidVisualizer {
         [SerializeField]
         protected ComputeShader centroidCalculator;
 
-        [SerializeField]
-        protected Mesh coneMesh;
-
         // Private Member Variables
         protected Camera cam;
         protected DataManager data;
         protected RenderParams rp;
+        protected GraphicsBuffer argsBuffer;
         protected GraphicsBuffer positionBuffer, colorBuffer, voronoiData;
         protected Bounds renderBounds;
         protected RenderTexture rt = null;
         protected bool validating = false;
         protected bool canPlay = true;
-        [SerializeField]
+
         protected Mesh voronoiMesh;
 
         protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
@@ -38,9 +36,7 @@ namespace CentroidVisualizer {
                             coneMeshVertexBufferId = Shader.PropertyToID("_ConeMeshVertexBuffer"),
                             coneMeshIndexBufferId = Shader.PropertyToID("_ConeMeshIndexBuffer"),
                             voronoiMeshVertexBufferId = Shader.PropertyToID("_VoronoiMeshVertexBuffer"),
-                            voronoiMeshIndexBufferId = Shader.PropertyToID("_VoronoiMeshIndexBuffer"),
-                            numConeVerticesId = Shader.PropertyToID("_NumConeVertices"),
-                            numConeIndicesId = Shader.PropertyToID("_NumConeIndices");
+                            voronoiMeshIndexBufferId = Shader.PropertyToID("_VoronoiMeshIndexBuffer");
 
         public RenderTexture RenderTexture {
             get => rt;
@@ -49,7 +45,7 @@ namespace CentroidVisualizer {
         protected void OnValidate() {
             Debug.Log("Validating");
             validating = true;
-            if (positionBuffer != null) {
+            if (argsBuffer != null) {
                 OnDisable();
                 OnEnable();
             }
@@ -63,14 +59,13 @@ namespace CentroidVisualizer {
                 Debug.Log("Requirements not met.");
             }
             cam = GetComponent<Camera>();
-            renderBounds = new Bounds(Vector3.zero, Vector3.one * 5f);
+            renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
         }
 
         protected void OnEnable() {
             Debug.Log("Enabling");
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, cam);
-                coneMesh = data.ConeMesh;
             }
             rt = CreateRenderTexture();
             CreateBuffers();
@@ -80,7 +75,8 @@ namespace CentroidVisualizer {
 
         protected void OnDisable() {
             Debug.Log("Disabling");
-            data = null;
+            argsBuffer?.Release();
+            argsBuffer = null;
             positionBuffer?.Release();
             positionBuffer = null;
             colorBuffer?.Release();
@@ -122,7 +118,7 @@ namespace CentroidVisualizer {
             //    centroidCalculator.FindKernel("GatherData"), numGroupsX, numGroupsY, 1
             //);
 
-            // Calculate Centroid
+            //// Calculate Centroid
             //int numGroups = Mathf.CeilToInt(numRegions / 64f);
             //centroidCalculator.Dispatch(
             //    centroidCalculator.FindKernel("CalculateCentroid"), numGroups, 1, 1
@@ -148,14 +144,18 @@ namespace CentroidVisualizer {
 
         protected void CreateBuffers() {
             Debug.Log("Creating buffers.");
+            argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, numRegions, sizeof(float) * 16);
             colorBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,numRegions, sizeof(float) * 2);
-            voronoiData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, numRegions, sizeof(int) * 3);
+            voronoiData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, numRegions, sizeof(float) * 3);
             voronoiMesh = CreateVoronoiMesh();
         }
 
         protected void LoadBuffers() {
             Debug.Log("Loading buffers.");
+            // Load Command Buffer
+            LoadArgBuffer(argsBuffer, data.ConeMesh);
+            
             // Load Positions & Colors
             positionBuffer.SetData(data.ConeMatrices);
             colorBuffer.SetData(data.Colors);
@@ -167,8 +167,6 @@ namespace CentroidVisualizer {
             centroidCalculator.SetInt(imageHeightId, rt.height);
             centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
-            centroidCalculator.SetInt(numConeVerticesId, data.ConeMesh.vertices.Length);
-            centroidCalculator.SetInt(numConeIndicesId, data.ConeMesh.triangles.Length);
 
             // Set compute shader data needed to gather voronoi data
             int kernelId = centroidCalculator.FindKernel("GatherData");
@@ -191,6 +189,17 @@ namespace CentroidVisualizer {
             centroidCalculator.SetBuffer(kernelId, coneMeshVertexBufferId, data.ConeMesh.GetVertexBuffer(0));
             centroidCalculator.SetBuffer(kernelId, voronoiMeshIndexBufferId, voronoiMesh.GetIndexBuffer());
            
+        }
+
+        protected void LoadArgBuffer(GraphicsBuffer buffer, Mesh mesh) {
+            GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
+            args[0].baseVertexIndex = mesh.GetBaseVertex(0);
+            args[0].indexCountPerInstance = mesh.GetIndexCount(0);
+            args[0].instanceCount = (uint)numRegions;
+            args[0].startIndex = mesh.GetIndexStart(0);
+            args[0].startInstance = 0;
+            buffer.SetData(args);
+            buffer.SetData(args);
         }
 
         protected RenderTexture CreateRenderTexture(RenderTextureDescriptor? descriptor = null) {
@@ -217,12 +226,10 @@ namespace CentroidVisualizer {
 
         protected Mesh CreateVoronoiMesh() {
             // Creates and configures a mesh to be updated via Compute Shader then rendered in a single draw call.
-            Mesh mesh = new() {
-                subMeshCount = 1
-            };
+            Mesh mesh = new();
             VertexAttributeDescriptor[] attributes = new[] {
                 new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 4),
-                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 1)
+                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 3)
             };
             mesh.vertexBufferTarget |= GraphicsBuffer.Target.Structured;
             mesh.indexBufferTarget |= GraphicsBuffer.Target.Structured;

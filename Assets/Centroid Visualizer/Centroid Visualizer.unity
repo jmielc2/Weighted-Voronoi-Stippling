@@ -318,8 +318,6 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: 270be8d1ccaaa0a45bcb93cd337358df, type: 2}
   numRegions: 10
   centroidCalculator: {fileID: 7200000, guid: ada390de0e0785a428217672a9da4f26, type: 3}
-  coneMesh: {fileID: 0}
-  voronoiMesh: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
