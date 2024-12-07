@@ -1,6 +1,8 @@
 #pragma target 4.5
 #pragma kernel CalculateCentroid
 #pragma kernel GatherData
+#pragma kernel PopulateVoronoiMeshVertexData
+#pragma kernel PopulateVoronoiMeshIndexData
 
 struct VoronoiRegion {
     int2 centerOfMass;
@@ -18,6 +20,12 @@ RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
+
+uniform StructuredBuffer<float3> _ConeMeshVertexBuffer;
+uniform StructuredBuffer<uint> _ConeMeshIndexBuffer;
+RWStructuredBuffer<VertexAttributes> _VoronoiMeshVertexBuffer;
+RWStructuredBuffer<uint> _VoronoiMeshIndexBuffer;
+uniform uint _NumConeVertices, _NumConeIndices;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -59,3 +67,24 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
     region.totalMass = 0;
     _VoronoiData[id.x] = region;
 }
+
+[numthreads(1, 64, 1)]
+void PopulateVoronoiMeshVertexData(uint3 id : SV_DispatchThreadID) {
+    if (id.x < _NumRegions && id.y < _NumConeVertices) {
+        int vIndex = id.x * _NumConeVertices + id.y;
+        float4 vPos = mul(_PositionMatrixBuffer[id.x], float4(_ConeMeshVertexBuffer[id.y], 1));
+        float vId = float(id.x) / float(_NumRegions);
+        VertexAttributes attribute = { vPos, vId };
+        _VoronoiMeshVertexBuffer[vIndex] = attribute;
+    }
+}
+
+[numthreads(1, 64, 1)]
+void PopulateVoronoiMeshIndexData(uint3 id : SV_DispatchThreadID) {
+    if (id.x < _NumRegions && id.y < _NumConeIndices) {
+        int vIndex = id.x * _NumConeIndices + id.y;
+        uint vInd = _ConeMeshIndexBuffer[id.y] + (_NumConeVertices * id.x);
+        _VoronoiMeshIndexBuffer[vIndex] = vInd;
+    }
+}
+
