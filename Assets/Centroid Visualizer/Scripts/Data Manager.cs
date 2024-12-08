@@ -70,7 +70,7 @@ namespace CentroidVisualizer {
             };
             // Calculate Minimum Number of Cone Slices
             float radius = Mathf.Sqrt(cam.pixelWidth * cam.pixelWidth + cam.pixelHeight * cam.pixelHeight);
-            float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius);
+            float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius) * 2f;
             int numSlices = Mathf.CeilToInt((2f * Mathf.PI) / maxAngle);
 
             // Generate Mesh
@@ -78,8 +78,7 @@ namespace CentroidVisualizer {
             int[] triangles = new int[numSlices * 3];
             vertices[0] = Vector3.zero;
             float angle = 0f;
-            float width = cam.aspect * 2f;
-            radius = Mathf.Sqrt(width * width + 4);
+            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.02f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,

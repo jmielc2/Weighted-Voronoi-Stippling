@@ -18,6 +18,7 @@ namespace CentroidVisualizer {
         protected ComputeBuffer positionBuffer, colorBuffer, voronoiData;
         protected Bounds renderBounds;
         protected RenderTexture rt = null;
+        protected int numGroups;
         protected bool validating = false;
         protected bool canPlay = true;
 
@@ -36,7 +37,6 @@ namespace CentroidVisualizer {
         }
 
         protected void OnValidate() {
-            Debug.Log("Validating");
             validating = true;
             if (argsBuffer != null) {
                 OnDisable();
@@ -46,7 +46,6 @@ namespace CentroidVisualizer {
         }
 
         protected virtual void Awake() {
-            Debug.Log("Awake");
             canPlay = RequirementCheck();
             if (!canPlay) {
                 Debug.Log("Requirements not met.");
@@ -56,19 +55,16 @@ namespace CentroidVisualizer {
         }
 
         protected virtual void OnEnable() {
-            Debug.Log("Enabling");
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, cam);
             }
-            CreateRenderTexture();
+            rt = CreateRenderTexture();
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
-            // RenderCentroid();
         }
 
         protected virtual void OnDisable() {
-            Debug.Log("Disabling");
             argsBuffer?.Release();
             argsBuffer = null;
             positionBuffer?.Release();
@@ -88,37 +84,33 @@ namespace CentroidVisualizer {
         }
 
         protected virtual void RenderCentroid() {
-            if (validating) {
-                return;
-            }
             // Create Voronoi Diagram
-            cam.targetTexture = rt;
-            RenderTexture.active = rt;
-            rp.material = material;
-            Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
+            // Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
+            Graphics.DrawMeshInstancedIndirect(data.ConeMesh, 0, material, renderBounds, argsBuffer);
             cam.Render();
 
             // Gather Voronoi Data
-            int numGroupsX = Mathf.CeilToInt(rt.width / 8f);
-            int numGroupsY = Mathf.CeilToInt(rt.height / 8f);
+            int numBatchesX = Mathf.CeilToInt(rt.width / 8f);
+            int numBatchesY = Mathf.CeilToInt(rt.height / 8f);
             centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("GatherData"), numGroupsX, numGroupsY, 1
+                centroidCalculator.FindKernel("GatherData"), numBatchesX, numBatchesY, 1
             );
 
             // Calculate Centroid
-            int numGroups = Mathf.CeilToInt(numRegions / 64f);
+            int numBatches = Mathf.CeilToInt(numRegions / 64f);
             centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("CalculateCentroid"), numGroups, 1, 1
+                centroidCalculator.FindKernel("CalculateCentroid"), numBatches, 1, 1
             );
         }
 
         protected virtual void ConfigureRenderPass() {
-            Debug.Log("Configuring renderer.");
             // Voronoi Material
             material.SetBuffer(positionBufferId, positionBuffer);
             material.SetBuffer(colorBufferId, colorBuffer);
 
-            rp = new RenderParams() {
+            cam.targetTexture = rt;
+            RenderTexture.active = rt;
+            rp = new RenderParams(material) {
                 camera = cam,
                 receiveShadows = false,
                 worldBounds = renderBounds,
@@ -127,7 +119,6 @@ namespace CentroidVisualizer {
         }
 
         protected virtual void CreateBuffers() {
-            Debug.Log("Creating buffers.");
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
@@ -135,7 +126,6 @@ namespace CentroidVisualizer {
         }
 
         protected virtual void LoadBuffers() {
-            Debug.Log("Loading buffers.");
             // Load Command Buffer
             LoadArgBuffer(argsBuffer, data.ConeMesh);
             
@@ -173,19 +163,20 @@ namespace CentroidVisualizer {
             buffer.SetData(args);
         }
 
-        protected void CreateRenderTexture() {
-            Debug.Log("Creating render texture.");
-            if (rt != null) {
-                DestroyRenderTexture();
-            }
-            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
+        protected RenderTexture CreateRenderTexture(RenderTextureDescriptor descriptor) {
+            RenderTexture texture = new RenderTexture(descriptor) {
+                filterMode = FilterMode.Point
+            };
+            texture.Create();
+            return texture;
+        }
+
+        protected RenderTexture CreateRenderTexture() {
+            var descriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
                 depthBufferBits = 32,
                 useMipMap = false
             };
-            rt = new RenderTexture(rtDescriptor) {
-                filterMode = FilterMode.Point
-            };
-            rt.Create();
+            return CreateRenderTexture(descriptor);
         }
 
         protected virtual void DestroyRenderTexture() {

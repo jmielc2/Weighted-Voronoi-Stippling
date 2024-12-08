@@ -16,29 +16,22 @@ namespace VoronoiVisualizer {
         protected GraphicsBuffer argsBuffer;
         protected ComputeBuffer positionBuffer, colorBuffer;
         protected Bounds renderBounds;
-        protected RenderTexture rt;
-        protected bool validating = false;
+        protected int numGroups;
+        protected bool captureScreen = false;
         protected bool canPlay = true;
 
+        protected const int numInstancesPerGroup = 1024;
         protected readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
                             colorBufferId = Shader.PropertyToID("_ColorBuffer");
                             
-        public RenderTexture renderTexture {
-            get => rt;
-        }
-
         protected void OnValidate() {
-            Debug.Log("Validating");
-            validating = true;
             if (argsBuffer != null) {
                 OnDisable();
                 OnEnable();
             }
-            validating = false;
         }
 
-        protected virtual void Awake() {
-            Debug.Log("Awake");
+        protected void Awake() {
             canPlay = RequirementCheck();
             if (!canPlay) {
                 Debug.Log("Requirements not met.");
@@ -47,66 +40,38 @@ namespace VoronoiVisualizer {
             renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
         }
 
-        protected virtual void OnEnable() {
-            Debug.Log("Enabling");
+        protected void OnEnable() {
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, cam);
             }
+            numGroups = Mathf.CeilToInt(numRegions / (float)numInstancesPerGroup);
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
-            RenderToTexture();
         }
 
-        protected virtual void OnDisable() {
-            Debug.Log("Disabling");
+        protected void OnDisable() {
             argsBuffer?.Release();
             argsBuffer = null;
             positionBuffer?.Release();
             positionBuffer = null;
             colorBuffer?.Release();
             colorBuffer = null;
-            DestroyRenderTexture();
         }
 
-        protected virtual void Update() {
+        protected void Update() {
             if (!canPlay) {
                 return;
             }
-            if (rt == null) {
-                RenderToTexture();
-            }
-            
-            if (Input.GetKeyDown(KeyCode.S)) {
-                Debug.Log("Writing texture to file.");
-                Texture2D texture = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false) {
-                    filterMode = FilterMode.Point,
-                };
-                texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-                System.IO.File.WriteAllBytes("./Documents/voronoi-diagram.png", texture.EncodeToPNG());
-            }
+            Graphics.DrawMeshInstancedIndirect(data.ConeMesh, 0, material, renderBounds, argsBuffer);
         }
 
-        protected virtual void RenderToTexture() {
-            if (validating) {
-                return;
-            }
-            CreateRenderTexture();
-            Debug.Log("Rendering to texture");
-            cam.targetTexture = rt;
-            RenderTexture.active = rt;
-            rp.material = material;
-            Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
-            cam.Render();
-        }
-
-        protected virtual void ConfigureRenderPass() {
-            Debug.Log("Configuring renderer.");
+        protected void ConfigureRenderPass() {
             // Voronoi Material
             material.SetBuffer(positionBufferId, positionBuffer);
             material.SetBuffer(colorBufferId, colorBuffer);
 
-            rp = new RenderParams() {
+            rp = new RenderParams(material) {
                 camera = cam,
                 receiveShadows = false,
                 worldBounds = renderBounds,
@@ -114,24 +79,22 @@ namespace VoronoiVisualizer {
             };
         }
 
-        protected virtual void CreateBuffers() {
-            Debug.Log("Creating buffers.");
+        protected void CreateBuffers() {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
         }
 
-        protected virtual void LoadBuffers() {
-            Debug.Log("Loading buffers.");
+        protected void LoadBuffers() {
             // Load Command Buffer
-            LoadArgBuffer(argsBuffer, data.ConeMesh);
+            LoadArgBuffer(ref argsBuffer, data.ConeMesh);
             
             // Load Positions & Colors
             positionBuffer.SetData(data.ConeMatrices);
             colorBuffer.SetData(data.Colors);
         }
 
-        protected virtual void LoadArgBuffer(GraphicsBuffer buffer, Mesh mesh) {
+        protected void LoadArgBuffer(ref GraphicsBuffer buffer, Mesh mesh) {
             GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
             args[0].baseVertexIndex = mesh.GetBaseVertex(0);
             args[0].indexCountPerInstance = mesh.GetIndexCount(0);
@@ -139,24 +102,6 @@ namespace VoronoiVisualizer {
             args[0].startIndex = mesh.GetIndexStart(0);
             args[0].startInstance = 0;
             buffer.SetData(args);
-            buffer.SetData(args);
-        }
-
-        protected void CreateRenderTexture() {
-            Debug.Log("Creating render texture.");
-            var rtDescriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
-                depthBufferBits = 32,
-                useMipMap = false,
-            };
-            rt = new RenderTexture(rtDescriptor) {
-                filterMode = FilterMode.Point
-            };
-            rt.Create();
-        }
-
-        protected virtual void DestroyRenderTexture() {
-            rt?.Release();
-            rt = null;
         }
 
         protected bool RequirementCheck() {

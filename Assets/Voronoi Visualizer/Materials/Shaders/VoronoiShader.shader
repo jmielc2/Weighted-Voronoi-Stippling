@@ -1,20 +1,20 @@
 Shader "Voronoi Visualizer/Voronoi Shader" {
     SubShader {
-        Tags { "RenderType"="Opaque" }
-        LOD 100
+        Cull Off
+        Zwrite On
 
         Pass {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma editor_sync_compilation
+
+            #pragma target 4.5
 
             #include "UnityCG.cginc"
-            #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawIndexedArgs
-            #include "UnityIndirect.cginc"
 
             struct appdata {
                 float4 vertex : POSITION;
-                uint instanceID : SV_InstanceID;
             };
 
             struct v2f {
@@ -26,12 +26,10 @@ Shader "Voronoi Visualizer/Voronoi Shader" {
             StructuredBuffer<float4x4> _PositionMatrixBuffer;
             StructuredBuffer<float3> _ColorBuffer;
 
-            v2f vert(appdata v) {
-                InitIndirectDrawArgs(0);
-                uint id = GetIndirectInstanceID(v.instanceID);
+            v2f vert(appdata v, uint instanceID : SV_InstanceID) {
                 v2f o;
-                o.instanceID = id;
-                o.vertex = mul(_PositionMatrixBuffer[id], v.vertex);
+                o.instanceID = instanceID;
+                o.vertex = mul(_PositionMatrixBuffer[instanceID], v.vertex);
                 o.vertex = UnityObjectToClipPos(o.vertex);
                 return o;
             }

@@ -47,9 +47,9 @@ namespace VoronoiVisualizer {
 
         private void AssignColors() {
             for(int i = 0; i < numPoints; i++) {
-                _colors[i].x = Random.Range(0f, 1f);
+                _colors[i].x = i / (float)numPoints;
                 _colors[i].y = Random.Range(0f, 1f);
-                _colors[i].z = i / (float)numPoints;
+                _colors[i].z = Random.Range(0f, 1f);
             }
         }
 
@@ -59,7 +59,7 @@ namespace VoronoiVisualizer {
             };
             // Calculate Minimum Number of Cone Slices
             float radius = Mathf.Sqrt(cam.pixelWidth * cam.pixelWidth + cam.pixelHeight * cam.pixelHeight);
-            float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius);
+            float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius) * 2f;
             int numSlices = Mathf.CeilToInt((2f * Mathf.PI) / maxAngle);
 
             // Generate Mesh
@@ -67,8 +67,7 @@ namespace VoronoiVisualizer {
             int[] triangles = new int[numSlices * 3];
             vertices[0] = Vector3.zero;
             float angle = 0f;
-            float width = cam.aspect * 2f;
-            radius = Mathf.Sqrt(width * width + 4);
+            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.025f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,
