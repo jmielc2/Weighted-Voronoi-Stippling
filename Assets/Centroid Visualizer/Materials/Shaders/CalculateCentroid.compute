@@ -12,8 +12,10 @@ Texture2D _VoronoiDiagram;
 RWStructuredBuffer<VoronoiRegion> _VoronoiData;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 uint _NumRegions;
-uint _ImageWidth, _ImageHeight;
-float _Width, _Height;
+uniform uint _ImageWidth, _ImageHeight;
+uniform float _Width, _Height;
+
+uniform uint _NumWavesPerDispatch = _ImageWidth * _ImageHeight / 32;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -54,4 +56,73 @@ void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
     region.centerOfMass = float2(0, 0);
     region.totalMass = 0;
     _VoronoiData[id.x] = region;
+}
+
+
+// New Improved Centroid Algorithm
+/*
+Part One: Average
+1) id.x => voronoiId, id.y => voronoiPixelIndex
+2) Ballot wave front with predicate that checks if pixelVoronoiId == voronoiId.
+3) Divide voronoiPixelIndex by count for pixels where pixelVoronoiId == voronoiId
+4) Sum dividends using WaveActiveSum and write sum into waveBuffer
+5) AllMemoryBarrierWithGroupSync to guarantee all waves have completed
+
+// Sum Averages
+6) id.y now represents waveId.
+7) Reduce all warpSums to single value using WaveActiveSum and parallel reduction technique.
+8) warpSum represents average voronoiPixelIndex for voronoi with ID of voronoiId, so convert to float2 to get centroid.
+*/
+
+[numthreads(1, 32, 1)]
+void Condense(uint3 dispatchId : SV_DispatchThreadID, uint groupId : SV_GroupId) {
+    // Part 1
+    if (dispatchId.y >= _ImageWidth * _ImageHeight) {
+        return;
+    }
+    const uint voronoiId = dispatchId.x;
+    const uint pixelVoronoiId = floor(_VoronoiDiagram[dispatchId.y].r * _NumRegions + 0.5);
+    bool isActive = (pixelVoronoiId == voronoiId);
+    const uint count = WaveActiveCountBits(isActive);
+    if (count == 0 || !isActive){
+        return;
+    }
+    
+    uint2 voronoiPixel = uint2(0, 0);
+    voronoiPixel.y = floor(dispatchId.y / _ImageWidth);
+    voronoiPixel.x = dispatchId.y - (voronoiPixel.y * _ImageWidth);
+    
+    
+    float2 centroidPos = float2(voronoiPixel.x / (float) count, voronoiPixel.y / (float) count);
+    centroidPos.x = WaveActiveSum(centroidPos.x);
+    centroidPos.y = WaveActiveSum(centroidPos.y);
+    // _WaveBuffer[id.x * _NumWavesPerDispatch + groupId] = centroidPos;
+}
+
+[numthreads(1, 32, 1)]
+void Reduce(uint3 id : SV_DispatchThreadID, uint groupId : SV_GroupID) {
+    // Part 2
+    if (id.y >= _NumWavesPerDispatch) {
+        return;
+    }
+    /*
+    float2 centroidPos = float2(0, 0);
+    float avgIndex = 0;
+    
+    for (int i = _NumWavesPerDispatch; i > 0; i /= 2) {
+        if (groupId > i) {
+            return;
+        }
+        centroidPos = _WaveBuffer[id.x * _NumWavesPerDispatch + id.y]
+        centroidPos.x = WaveActiveSum(centroidPos.x);
+        centroidPos.y = WaveActiveSum(centroidPos.y);
+        _WaveBuffer[id.x * _NumWavesPerDispatch + groupId]
+    }
+    
+    
+    if (WaveIsFirstLane()) {
+        float2 worldCoord = PixelToWorldCoord(centroidPos);
+        _PositionMatrixBuffer[id.x]._m03_m13 = worldCoord;
+    }
+    */
 }
