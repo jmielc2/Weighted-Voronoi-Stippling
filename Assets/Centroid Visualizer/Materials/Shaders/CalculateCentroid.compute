@@ -1,21 +1,18 @@
-#pragma target 4.5
-#pragma kernel CalculateCentroid
-#pragma kernel GatherData
-
-struct VoronoiRegion
-{
-    int2 centerOfMass;
-    int totalMass;
-};
+#pragma target 5.0
+#pragma kernel Condense
+#pragma kernel Reduce
+#pragma use_dxc
 
 Texture2D _VoronoiDiagram;
-RWStructuredBuffer<VoronoiRegion> _VoronoiData;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
-uint _NumRegions;
+RWStructuredBuffer<float3> _ColorBuffer;
+
+uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
 
-uniform uint _NumWavesPerDispatch = _ImageWidth * _ImageHeight / 32;
+RWStructuredBuffer<float3> _WaveBuffer;
+uniform uint _NumWavesPerDispatch;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -24,51 +21,15 @@ float2 PixelToWorldCoord(float2 pixel) {
     );
 }
 
-[numthreads(8, 8, 1)]
-void GatherData(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= _ImageWidth || id.y >= _ImageHeight) {
-        return;
-    }
-    float4 color = _VoronoiDiagram[id.xy];
-    int voronoiId = floor(color.x * _NumRegions + 0.5);
-    InterlockedAdd(_VoronoiData[voronoiId].totalMass, 1);
-    InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.x, id.x);
-    InterlockedAdd(_VoronoiData[voronoiId].centerOfMass.y, id.y);
-}
-
-[numthreads(64, 1, 1)]
-void CalculateCentroid(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= _NumRegions) {
-        return;
-    }
-    float2 position = _PositionMatrixBuffer[id.x]._m03_m13;
-    
-    // Update position here
-    VoronoiRegion region = _VoronoiData[id.x];
-    float2 centerOfMass = region.centerOfMass;
-    float totalMass = region.totalMass;
-    if (totalMass != 0) {
-        centerOfMass /= totalMass;
-        position.xy = PixelToWorldCoord(centerOfMass);
-    }
-    _PositionMatrixBuffer[id.x]._m03_m13 = position;
-    
-    region.centerOfMass = float2(0, 0);
-    region.totalMass = 0;
-    _VoronoiData[id.x] = region;
-}
-
-
-// New Improved Centroid Algorithm
+// Centroid Algorithm
 /*
-Part One: Average
-1) id.x => voronoiId, id.y => voronoiPixelIndex
+Part One: Condense
 2) Ballot wave front with predicate that checks if pixelVoronoiId == voronoiId.
 3) Divide voronoiPixelIndex by count for pixels where pixelVoronoiId == voronoiId
 4) Sum dividends using WaveActiveSum and write sum into waveBuffer
 5) AllMemoryBarrierWithGroupSync to guarantee all waves have completed
 
-// Sum Averages
+Part Two: Reduce
 6) id.y now represents waveId.
 7) Reduce all warpSums to single value using WaveActiveSum and parallel reduction technique.
 8) warpSum represents average voronoiPixelIndex for voronoi with ID of voronoiId, so convert to float2 to get centroid.
@@ -76,53 +37,55 @@ Part One: Average
 
 [numthreads(1, 32, 1)]
 void Condense(uint3 dispatchId : SV_DispatchThreadID, uint groupId : SV_GroupId) {
-    // Part 1
+    /*
     if (dispatchId.y >= _ImageWidth * _ImageHeight) {
         return;
     }
     const uint voronoiId = dispatchId.x;
-    const uint pixelVoronoiId = floor(_VoronoiDiagram[dispatchId.y].r * _NumRegions + 0.5);
+    uint2 pixelPosition = uint2(dispatchId.y, floor(dispatchId.y / _ImageWidth));
+    pixelPosition.x -= pixelPosition.y * _ImageWidth;
+    const uint pixelVoronoiId = floor(_VoronoiDiagram[pixelPosition].r * _NumRegions + 0.5);
     bool isActive = (pixelVoronoiId == voronoiId);
-    const uint count = WaveActiveCountBits(isActive);
-    if (count == 0 || !isActive){
+    uint count = WaveActiveCountBits(isActive);
+    if (count == 0) {
+        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId] = float3(0, 0, 0);
         return;
     }
-    
-    uint2 voronoiPixel = uint2(0, 0);
-    voronoiPixel.y = floor(dispatchId.y / _ImageWidth);
-    voronoiPixel.x = dispatchId.y - (voronoiPixel.y * _ImageWidth);
-    
-    
-    float2 centroidPos = float2(voronoiPixel.x / (float) count, voronoiPixel.y / (float) count);
+    if (!isActive) {
+        return;
+    }
+    float2 centroidPos = float2(
+        pixelPosition.x / (float) count,
+        pixelPosition.y / (float) count
+    );
     centroidPos.x = WaveActiveSum(centroidPos.x);
     centroidPos.y = WaveActiveSum(centroidPos.y);
-    // _WaveBuffer[id.x * _NumWavesPerDispatch + groupId] = centroidPos;
+    if (WaveIsFirstLane()) {
+        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId] = float3(centroidPos, 1);
+    }
+    */
 }
 
 [numthreads(1, 32, 1)]
-void Reduce(uint3 id : SV_DispatchThreadID, uint groupId : SV_GroupID) {
-    // Part 2
+void Reduce(uint3 id : SV_DispatchThreadID) {
+    /*
     if (id.y >= _NumWavesPerDispatch) {
         return;
     }
-    /*
-    float2 centroidPos = float2(0, 0);
-    float avgIndex = 0;
-    
-    for (int i = _NumWavesPerDispatch; i > 0; i /= 2) {
-        if (groupId > i) {
+    for (int i = 1; i < _NumWavesPerDispatch; i *= 2) {
+        if (id.y % (i * 2) == 0) {
+            if (id.y + i < _NumWavesPerDispatch) {
+                _WaveBuffer[id.x * _NumWavesPerDispatch + id.y] += _WaveBuffer[id.x * _NumWavesPerDispatch + id.y + i];
+            }
+        } else {
             return;
         }
-        centroidPos = _WaveBuffer[id.x * _NumWavesPerDispatch + id.y]
-        centroidPos.x = WaveActiveSum(centroidPos.x);
-        centroidPos.y = WaveActiveSum(centroidPos.y);
-        _WaveBuffer[id.x * _NumWavesPerDispatch + groupId]
     }
-    
     
     if (WaveIsFirstLane()) {
-        float2 worldCoord = PixelToWorldCoord(centroidPos);
-        _PositionMatrixBuffer[id.x]._m03_m13 = worldCoord;
+        // _PositionMatrixBuffer[id.x]._m03_m13 = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch] / _NumWavesPerDispatch);
+        _ColorBuffer[id.x].gb = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch].xy / _WaveBuffer[id.x * _NumWavesPerDispatch].z);
     }
-    */
+*/
+    _ColorBuffer[id.x] = float3(0.2, 0.5, 0.8);
 }

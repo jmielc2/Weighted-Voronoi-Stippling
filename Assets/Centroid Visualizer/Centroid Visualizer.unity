@@ -246,7 +246,7 @@ Camera:
   m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 1, g: 1, b: 1, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -316,7 +316,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: 76196e07c9330466bb169ac38b1cbe14, type: 2}
-  numRegions: 10000
+  numRegions: 1000
   centroidCalculator: {fileID: 7200000, guid: ada390de0e0785a428217672a9da4f26, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

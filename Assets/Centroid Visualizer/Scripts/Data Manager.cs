@@ -4,16 +4,9 @@ namespace CentroidVisualizer {
     public class DataManager {
         readonly Vector3[] _colors;
         readonly Matrix4x4[] _coneMatrices;
-        readonly VoronoiRegion[] _voronoiData;
         readonly int numPoints;
 
         static Mesh _coneMesh = null;
-
-        public struct VoronoiRegion {
-            Vector2 centerOfMass;
-            float totalMass;
-        }
-
         public DataManager(int numRegions, Camera cam) {
             if (_coneMesh == null) {
                 CreateConeMesh(cam);
@@ -21,7 +14,6 @@ namespace CentroidVisualizer {
             numPoints = numRegions;
             _colors = new Vector3[numPoints];
             _coneMatrices = new Matrix4x4[numPoints];
-            _voronoiData = new VoronoiRegion[numPoints];
             AssignColors();
             GenerateRandomPoints(cam);
         }
@@ -36,10 +28,6 @@ namespace CentroidVisualizer {
 
         public Matrix4x4[] ConeMatrices {
             get { return _coneMatrices; }
-        }
-
-        public VoronoiRegion[] VoronoiData {
-            get { return _voronoiData; }
         }
 
         public Mesh ConeMesh {
@@ -78,7 +66,7 @@ namespace CentroidVisualizer {
             int[] triangles = new int[numSlices * 3];
             vertices[0] = Vector3.zero;
             float angle = 0f;
-            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.02f;
+            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.25f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,
