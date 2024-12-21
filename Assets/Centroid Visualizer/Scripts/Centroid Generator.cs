@@ -13,7 +13,6 @@ namespace CentroidVisualizer {
         // Private Member Variables
         Camera cam;
         DataManager data;
-        RenderParams rp;
         GraphicsBuffer argsBuffer;
         ComputeBuffer positionBuffer, colorBuffer, waveBuffer;
         Bounds renderBounds;
@@ -85,16 +84,15 @@ namespace CentroidVisualizer {
 
         void RenderCentroid() {
             // Create Voronoi Diagram
-            // Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
             Graphics.DrawMeshInstancedIndirect(data.ConeMesh, 0, material, renderBounds, argsBuffer);
             cam.Render();
 
-            // Gather Voronoi Data
+            // Condense
             centroidCalculator.Dispatch(
                 centroidCalculator.FindKernel("Condense"), numRegions, numWavesPerDispatch, 1
             );
 
-            // Calculate Centroid
+            // Reduce
             int numBatches = Mathf.CeilToInt(numWavesPerDispatch / 32f);
             centroidCalculator.Dispatch(
                 centroidCalculator.FindKernel("Reduce"), numRegions, numBatches, 1
@@ -108,14 +106,8 @@ namespace CentroidVisualizer {
 
             cam.targetTexture = rt;
             RenderTexture.active = rt;
-            rp = new RenderParams(material) {
-                camera = cam,
-                receiveShadows = false,
-                worldBounds = renderBounds,
-                shadowCastingMode = ShadowCastingMode.Off
-            };
-        }
-
+        } 
+        
         void CreateBuffers() {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);

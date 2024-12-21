@@ -1,4 +1,3 @@
-#pragma target 5.0
 #pragma kernel Condense
 #pragma kernel Reduce
 #pragma use_dxc
@@ -36,8 +35,7 @@ Part Two: Reduce
 */
 
 [numthreads(1, 32, 1)]
-void Condense(uint3 dispatchId : SV_DispatchThreadID, uint groupId : SV_GroupId) {
-    /*
+void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId) {
     if (dispatchId.y >= _ImageWidth * _ImageHeight) {
         return;
     }
@@ -48,44 +46,43 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint groupId : SV_GroupId)
     bool isActive = (pixelVoronoiId == voronoiId);
     uint count = WaveActiveCountBits(isActive);
     if (count == 0) {
-        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId] = float3(0, 0, 0);
+        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId.y] = float3(0, 0, 0);
         return;
     }
     if (!isActive) {
         return;
     }
-    float2 centroidPos = float2(
-        pixelPosition.x / (float) count,
-        pixelPosition.y / (float) count
-    );
-    centroidPos.x = WaveActiveSum(centroidPos.x);
-    centroidPos.y = WaveActiveSum(centroidPos.y);
+    float2 centroidPos = float2(0, 0);
+    centroidPos.x = WaveActiveSum((float) pixelPosition.x) * count;
+    centroidPos.y = WaveActiveSum((float) pixelPosition.y) * count;
     if (WaveIsFirstLane()) {
-        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId] = float3(centroidPos, 1);
+        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId.y] = float3(centroidPos, count);
     }
-    */
 }
 
 [numthreads(1, 32, 1)]
 void Reduce(uint3 id : SV_DispatchThreadID) {
-    /*
     if (id.y >= _NumWavesPerDispatch) {
         return;
     }
+    int even = id.y;
     for (int i = 1; i < _NumWavesPerDispatch; i *= 2) {
-        if (id.y % (i * 2) == 0) {
-            if (id.y + i < _NumWavesPerDispatch) {
+        if (even & 0x1 == 0) {
+            if (id.y + i < _NumWavesPerDispatch){
                 _WaveBuffer[id.x * _NumWavesPerDispatch + id.y] += _WaveBuffer[id.x * _NumWavesPerDispatch + id.y + i];
+            } else {
+                return;
             }
         } else {
             return;
         }
+        even >> 1;
+        AllMemoryBarrierWithGroupSync();
     }
     
-    if (WaveIsFirstLane()) {
-        // _PositionMatrixBuffer[id.x]._m03_m13 = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch] / _NumWavesPerDispatch);
-        _ColorBuffer[id.x].gb = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch].xy / _WaveBuffer[id.x * _NumWavesPerDispatch].z);
+    if (WaveIsFirstLane() && _WaveBuffer[id.x * _NumWavesPerDispatch].z != 0) {
+        float2 result = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch].xy / _WaveBuffer[id.x * _NumWavesPerDispatch].z);
+        // _PositionMatrixBuffer[id.x]._m03_m13 = PixelToWorldCoord(_WaveBuffer[id.x * _NumWavesPerDispatch].xy / _WaveBuffer[id.x * _NumWavesPerDispatch].z);
+        _ColorBuffer[id.x] = float3(0, (result + 0.5 * float2(_Width, _Height)) * 0.5);
     }
-*/
-    _ColorBuffer[id.x] = float3(0.2, 0.5, 0.8);
 }
