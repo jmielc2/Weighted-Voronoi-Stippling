@@ -29,6 +29,7 @@ namespace CentroidVisualizer {
                             imageHeightId = Shader.PropertyToID("_ImageHeight"),
                             widthId = Shader.PropertyToID("_Width"),
                             heightId = Shader.PropertyToID("_Height"),
+                            voronoiIdId = Shader.PropertyToID("_VoronoiId"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
                             numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch");
 
@@ -88,14 +89,15 @@ namespace CentroidVisualizer {
             cam.Render();
 
             // Condense
+            centroidCalculator.SetInt(voronoiIdId, 0);
             centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("Condense"), numRegions, numWavesPerDispatch, 1
+                centroidCalculator.FindKernel("Condense"), 1, numWavesPerDispatch, 1
             );
 
             // Reduce
             int numBatches = Mathf.CeilToInt(numWavesPerDispatch / 32f);
             centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("Reduce"), numRegions, numBatches, 1
+                centroidCalculator.FindKernel("Reduce"), 1, numBatches, 1
             );
         }
 
@@ -112,7 +114,7 @@ namespace CentroidVisualizer {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
-            waveBuffer = new ComputeBuffer(numWavesPerDispatch * numRegions, sizeof(float) * 3);
+            waveBuffer = new ComputeBuffer(numWavesPerDispatch, sizeof(float) * 3);
         }
 
         void LoadBuffers() {

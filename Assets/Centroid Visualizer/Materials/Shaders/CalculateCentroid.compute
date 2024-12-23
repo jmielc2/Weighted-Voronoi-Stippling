@@ -9,6 +9,7 @@ RWStructuredBuffer<float3> _ColorBuffer;
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
+uniform uint _VoronoiId;
 
 RWStructuredBuffer<float3> _WaveBuffer;
 uniform uint _NumWavesPerDispatch;
@@ -44,14 +45,13 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     uint2 pixelPosition = uint2(dispatchId.y, floor(dispatchId.y / _ImageWidth));
     pixelPosition.x -= pixelPosition.y * _ImageWidth;
     const uint pixelVoronoiId = floor(_VoronoiDiagram[pixelPosition].r * _NumRegions + 0.5);
-    bool isActive = (pixelVoronoiId == dispatchId.x);
+    bool isActive = (pixelVoronoiId == _VoronoiId);
     uint count = WaveActiveCountBits(isActive);
     if (count == 0)
     {
-        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + groupId.y] = float3(0, 0, 0);
+        _WaveBuffer[groupId.y] = float3(0, 0, 0);
         return;
     }
-    AllMemoryBarrierWithGroupSync();
     if (!isActive)
     {
         return;
@@ -60,11 +60,10 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     float2 worldPos = PixelToWorldCoord(pixelPosition);
     centroidPos.x = WaveActiveSum(worldPos.x);
     centroidPos.y = WaveActiveSum(worldPos.y);
-    int index = floor(dispatchId.y / 32);
     if (WaveIsFirstLane()) {
-        _WaveBuffer[dispatchId.x * _NumWavesPerDispatch + index] = float3(centroidPos, count);
+        _WaveBuffer[groupId.y] = float3(centroidPos, count);
     }
-    AllMemoryBarrierWithGroupSync();
+    AllMemoryBarrier();
 }
 
 [numthreads(1, 32, 1)]
@@ -79,7 +78,7 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 threadId : SV_GroupThreadID) {
         {
             _WaveBuffer[id.x * _NumWavesPerDispatch + id.y] += _WaveBuffer[id.x * _NumWavesPerDispatch + id.y + i];
         }
-        AllMemoryBarrierWithGroupSync();
+        AllMemoryBarrier();
     }
     
     if (id.y == 0) {
@@ -88,5 +87,5 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 threadId : SV_GroupThreadID) {
             _PositionMatrixBuffer[id.x]._m03_m13 = data.xy / data.z;
         }
     }
-    AllMemoryBarrierWithGroupSync();
+    AllMemoryBarrier();
 }
