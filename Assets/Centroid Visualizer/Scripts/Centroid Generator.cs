@@ -31,7 +31,8 @@ namespace CentroidVisualizer {
                             heightId = Shader.PropertyToID("_Height"),
                             voronoiIdId = Shader.PropertyToID("_VoronoiId"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
-                            numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch");
+                            numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch"),
+                            offsetId = Shader.PropertyToID("_Offset");
 
         public RenderTexture renderTexture {
             get => rt;
@@ -90,15 +91,24 @@ namespace CentroidVisualizer {
 
             // Condense
             centroidCalculator.SetInt(voronoiIdId, 0);
+            int kernelId = centroidCalculator.FindKernel("Condense");
             centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("Condense"), 1, numWavesPerDispatch, 1
+                kernelId, numRegions, numWavesPerDispatch, 1
             );
 
             // Reduce
-            int numBatches = Mathf.CeilToInt(numWavesPerDispatch / 32f);
-            centroidCalculator.Dispatch(
-                centroidCalculator.FindKernel("Reduce"), 1, numBatches, 1
-            );
+            int offset = 1;
+            int remaining = numWavesPerDispatch;
+            kernelId = centroidCalculator.FindKernel("Reduce");
+            while (offset < numWavesPerDispatch) {
+                int numBatches = Mathf.CeilToInt(remaining / 64f);
+                centroidCalculator.SetInt(offsetId, offset);
+                centroidCalculator.Dispatch(
+                    kernelId, numRegions, numBatches, 1
+                );
+                remaining = Mathf.CeilToInt(remaining / 2f);
+                offset *= 2;
+            }
         }
 
         void ConfigureRenderPass() {
@@ -114,7 +124,7 @@ namespace CentroidVisualizer {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
-            waveBuffer = new ComputeBuffer(numWavesPerDispatch, sizeof(float) * 3);
+            waveBuffer = new ComputeBuffer(numRegions * numWavesPerDispatch, sizeof(float) * 3);
         }
 
         void LoadBuffers() {

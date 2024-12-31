@@ -9,10 +9,10 @@ RWStructuredBuffer<float3> _ColorBuffer;
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
-uniform uint _VoronoiId;
 
 RWStructuredBuffer<float3> _WaveBuffer;
 uniform uint _NumWavesPerDispatch;
+uniform uint _Offset;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -35,6 +35,7 @@ Part Two: Reduce
 8) warpSum represents average voronoiPixelIndex for voronoi with ID of voronoiId, so convert to float2 to get centroid.
 */
 
+// https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf
 [numthreads(1, 32, 1)]
 void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId)
 {
@@ -45,11 +46,11 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     uint2 pixelPosition = uint2(dispatchId.y, floor(dispatchId.y / _ImageWidth));
     pixelPosition.x -= pixelPosition.y * _ImageWidth;
     const uint pixelVoronoiId = floor(_VoronoiDiagram[pixelPosition].r * _NumRegions + 0.5);
-    bool isActive = (pixelVoronoiId == _VoronoiId);
+    bool isActive = (pixelVoronoiId == dispatchId.x);
     uint count = WaveActiveCountBits(isActive);
     if (count == 0)
     {
-        _WaveBuffer[groupId.y] = float3(0, 0, 0);
+        _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(0, 0, 0);
         return;
     }
     if (!isActive)
@@ -61,31 +62,26 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     centroidPos.x = WaveActiveSum(worldPos.x);
     centroidPos.y = WaveActiveSum(worldPos.y);
     if (WaveIsFirstLane()) {
-        _WaveBuffer[groupId.y] = float3(centroidPos, count);
+        _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(centroidPos, count);
     }
     AllMemoryBarrier();
 }
 
 [numthreads(1, 32, 1)]
-void Reduce(uint3 id : SV_DispatchThreadID, uint3 threadId : SV_GroupThreadID) {
-    if (id.y >= _NumWavesPerDispatch) {
+void Reduce(uint3 id : SV_DispatchThreadID, uint3 threadId : SV_GroupThreadID)
+{
+    uint index = _Offset * 2 * id.y;
+    if (index >= _NumWavesPerDispatch || index + _Offset >= _NumWavesPerDispatch)
+    {
         return;
     }
-    // groupshared float3 data[32];
-    // data[threadId.y] = _WaveBuffer[id.x * _NumWavesPerDispatch + id.y];
-    for (int i = 1; i < _NumWavesPerDispatch; i *= 2) {
-        if (id.y % (i * 2) == 0 && id.y + i < _NumWavesPerDispatch)
-        {
-            _WaveBuffer[id.x * _NumWavesPerDispatch + id.y] += _WaveBuffer[id.x * _NumWavesPerDispatch + id.y + i];
-        }
-        AllMemoryBarrier();
+    if (_Offset * 2 < _NumWavesPerDispatch)
+    {
+        _WaveBuffer[(id.x * _NumWavesPerDispatch) + index] += _WaveBuffer[(id.x * _NumWavesPerDispatch) + index + _Offset];
     }
-    
-    if (id.y == 0) {
-        if (_WaveBuffer[id.x * _NumWavesPerDispatch].z != 0) {
-            float3 data = _WaveBuffer[id.x * _NumWavesPerDispatch];
-            _PositionMatrixBuffer[id.x]._m03_m13 = data.xy / data.z;
-        }
+    else if (WaveIsFirstLane())
+    {
+        float3 data = _WaveBuffer[id.x * _NumWavesPerDispatch] + _WaveBuffer[(id.x * _NumWavesPerDispatch) + _Offset];
+        _PositionMatrixBuffer[id.x]._m03_m13 = data.xy / data.z;
     }
-    AllMemoryBarrier();
 }
