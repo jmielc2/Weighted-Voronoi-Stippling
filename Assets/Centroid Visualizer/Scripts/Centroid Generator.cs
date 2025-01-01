@@ -18,7 +18,7 @@ namespace CentroidVisualizer {
         Bounds renderBounds;
         RenderTexture rt = null;
         bool canPlay = true;
-
+        RenderParams rp;
         int numWavesPerDispatch;
 
         readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
@@ -29,10 +29,11 @@ namespace CentroidVisualizer {
                             imageHeightId = Shader.PropertyToID("_ImageHeight"),
                             widthId = Shader.PropertyToID("_Width"),
                             heightId = Shader.PropertyToID("_Height"),
-                            voronoiIdId = Shader.PropertyToID("_VoronoiId"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
                             numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch"),
                             offsetId = Shader.PropertyToID("_Offset");
+
+        int condenseKernelId, reduceKernelId;
 
         public RenderTexture renderTexture {
             get => rt;
@@ -51,6 +52,8 @@ namespace CentroidVisualizer {
                 Debug.Log("Requirements not met.");
             }
             cam = GetComponent<Camera>();
+            condenseKernelId = centroidCalculator.FindKernel("Condense");
+            reduceKernelId = centroidCalculator.FindKernel("Reduce");
             renderBounds = new Bounds(Vector3.zero, Vector3.one * 3f);
         }
 
@@ -74,7 +77,8 @@ namespace CentroidVisualizer {
             colorBuffer = null;
             waveBuffer?.Release();
             waveBuffer = null;
-            DestroyRenderTexture();
+            rt?.Release();
+            rt = null;
         }
 
         void Update() {
@@ -86,25 +90,24 @@ namespace CentroidVisualizer {
 
         void RenderCentroid() {
             // Create Voronoi Diagram
-            Graphics.DrawMeshInstancedIndirect(data.ConeMesh, 0, material, renderBounds, argsBuffer);
+            Graphics.RenderMeshIndirect(rp, data.ConeMesh, argsBuffer);
             cam.Render();
+        }
 
+        public void CalculateCentroid() {
             // Condense
-            centroidCalculator.SetInt(voronoiIdId, 0);
-            int kernelId = centroidCalculator.FindKernel("Condense");
             centroidCalculator.Dispatch(
-                kernelId, numRegions, numWavesPerDispatch, 1
+                condenseKernelId, numRegions, numWavesPerDispatch, 1
             );
 
             // Reduce
             int offset = 1;
             int remaining = numWavesPerDispatch;
-            kernelId = centroidCalculator.FindKernel("Reduce");
             while (offset < numWavesPerDispatch) {
                 int numBatches = Mathf.CeilToInt(remaining / 64f);
                 centroidCalculator.SetInt(offsetId, offset);
                 centroidCalculator.Dispatch(
-                    kernelId, numRegions, numBatches, 1
+                    reduceKernelId, numRegions, numBatches, 1
                 );
                 remaining = Mathf.CeilToInt(remaining / 2f);
                 offset *= 2;
@@ -115,9 +118,14 @@ namespace CentroidVisualizer {
             // Voronoi Material
             material.SetBuffer(positionBufferId, positionBuffer);
             material.SetBuffer(colorBufferId, colorBuffer);
-
             cam.targetTexture = rt;
-            RenderTexture.active = rt;
+            rp = new RenderParams() {
+                camera = cam,
+                worldBounds = renderBounds,
+                material = material,
+                shadowCastingMode = ShadowCastingMode.Off,
+                receiveShadows = false
+            };
         } 
         
         void CreateBuffers() {
@@ -144,15 +152,13 @@ namespace CentroidVisualizer {
             centroidCalculator.SetFloat(heightId, 2f);
 
             // Set compute shader data needed to gather voronoi data
-            int kernelId = centroidCalculator.FindKernel("Condense");
-            centroidCalculator.SetTexture(kernelId, voronoiDiagramId, rt);
-            centroidCalculator.SetBuffer(kernelId, waveBufferId, waveBuffer);
+            centroidCalculator.SetTexture(condenseKernelId, voronoiDiagramId, rt);
+            centroidCalculator.SetBuffer(condenseKernelId, waveBufferId, waveBuffer);
 
             // Set compute shader data needed to calculate centroids
-            kernelId = centroidCalculator.FindKernel("Reduce");
-            centroidCalculator.SetBuffer(kernelId, waveBufferId, waveBuffer);
-            centroidCalculator.SetBuffer(kernelId, colorBufferId, colorBuffer);
-            centroidCalculator.SetBuffer(kernelId, positionBufferId, positionBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, waveBufferId, waveBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, colorBufferId, colorBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, positionBufferId, positionBuffer);
         }
 
         void LoadArgBuffer(GraphicsBuffer buffer, Mesh mesh) {
@@ -162,7 +168,6 @@ namespace CentroidVisualizer {
             args[0].instanceCount = (uint)numRegions;
             args[0].startIndex = mesh.GetIndexStart(0);
             args[0].startInstance = 0;
-            buffer.SetData(args);
             buffer.SetData(args);
         }
 
@@ -181,11 +186,6 @@ namespace CentroidVisualizer {
                 enableRandomWrite = true
             };
             return CreateRenderTexture(descriptor);
-        }
-
-        void DestroyRenderTexture() {
-            rt?.Release();
-            rt = null;
         }
 
         bool RequirementCheck() {

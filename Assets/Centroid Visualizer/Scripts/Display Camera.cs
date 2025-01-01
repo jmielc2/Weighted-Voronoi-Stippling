@@ -17,6 +17,7 @@ namespace CentroidVisualizer {
         }
 
         private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+            generator.CalculateCentroid();
             RenderTexture rt = generator.renderTexture;
             Graphics.Blit(rt, destination);
             

@@ -5,14 +5,12 @@
 RWTexture2D<float4> _VoronoiDiagram;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 RWStructuredBuffer<float3> _ColorBuffer;
+RWStructuredBuffer<float3> _WaveBuffer;
 
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
-
-RWStructuredBuffer<float3> _WaveBuffer;
-uniform uint _NumWavesPerDispatch;
-uniform uint _Offset;
+uniform uint _NumWavesPerDispatch, _Offset;
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -50,7 +48,10 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     uint count = WaveActiveCountBits(isActive);
     if (count == 0)
     {
-        _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(0, 0, 0);
+        if (WaveIsFirstLane())
+        {
+            _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(0, 0, 0);
+        }
         return;
     }
     if (!isActive)
@@ -64,7 +65,6 @@ void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId
     if (WaveIsFirstLane()) {
         _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(centroidPos, count);
     }
-    AllMemoryBarrier();
 }
 
 [numthreads(1, 32, 1)]
