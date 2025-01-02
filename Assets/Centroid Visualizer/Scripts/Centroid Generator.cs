@@ -19,7 +19,7 @@ namespace CentroidVisualizer {
         RenderTexture rt = null;
         bool canPlay = true;
         RenderParams rp;
-        int numWavesPerDispatch;
+        int numGroupsPerDispatch;
 
         readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
                             colorBufferId = Shader.PropertyToID("_ColorBuffer"),
@@ -31,7 +31,8 @@ namespace CentroidVisualizer {
                             heightId = Shader.PropertyToID("_Height"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
                             numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch"),
-                            offsetId = Shader.PropertyToID("_Offset");
+                            offsetId = Shader.PropertyToID("_Offset"),
+                            baseId = Shader.PropertyToID("_Base");
 
         int condenseKernelId, reduceKernelId;
 
@@ -62,7 +63,7 @@ namespace CentroidVisualizer {
                 data = new DataManager(numRegions, cam);
             }
             rt = CreateRenderTexture();
-            numWavesPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 32f);
+            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 32f);
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
@@ -95,22 +96,21 @@ namespace CentroidVisualizer {
         }
 
         public void CalculateCentroid() {
-            // Condense
-            centroidCalculator.Dispatch(
-                condenseKernelId, numRegions, numWavesPerDispatch, 1
-            );
+            for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 1024) {
+                int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
+                
+                // Condense
+                centroidCalculator.SetInt(baseId, baseOffset);
+                centroidCalculator.Dispatch(condenseKernelId, regionCount, numGroupsPerDispatch, 1);
 
-            // Reduce
-            int offset = 1;
-            int remaining = numWavesPerDispatch;
-            while (offset < numWavesPerDispatch) {
-                int numBatches = Mathf.CeilToInt(remaining / 64f);
-                centroidCalculator.SetInt(offsetId, offset);
-                centroidCalculator.Dispatch(
-                    reduceKernelId, numRegions, numBatches, 1
-                );
-                remaining = Mathf.CeilToInt(remaining / 2f);
-                offset *= 2;
+                // Reduce
+                int remaining = numGroupsPerDispatch;
+                for (int offset = 1; offset < numGroupsPerDispatch; offset *= 2) {
+                    int numBatches = Mathf.CeilToInt(remaining / 2048f);
+                    centroidCalculator.SetInt(offsetId, offset);
+                    centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
+                    remaining = Mathf.CeilToInt(remaining / 2f);
+                }
             }
         }
 
@@ -132,7 +132,7 @@ namespace CentroidVisualizer {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
-            waveBuffer = new ComputeBuffer(numRegions * numWavesPerDispatch, sizeof(float) * 3);
+            waveBuffer = new ComputeBuffer(1024 * numGroupsPerDispatch, sizeof(float) * 3);
         }
 
         void LoadBuffers() {
@@ -147,7 +147,7 @@ namespace CentroidVisualizer {
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, rt.width);
             centroidCalculator.SetInt(imageHeightId, rt.height);
-            centroidCalculator.SetInt(numWavesPerDispatchId, numWavesPerDispatch);
+            centroidCalculator.SetInt(numWavesPerDispatchId, numGroupsPerDispatch);
             centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
 
