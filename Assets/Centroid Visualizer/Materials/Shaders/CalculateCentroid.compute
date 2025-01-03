@@ -10,7 +10,9 @@ RWStructuredBuffer<float3> _WaveBuffer;
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
-uniform uint _NumWavesPerDispatch, _Offset, _Base;
+uniform uint _NumGroupsPerDispatch, _Stride, _Base, _Remaining;
+
+groupshared float3 data[1024];
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -34,42 +36,54 @@ Part Two: Reduce
 */
 
 [numthreads(1, 32, 1)]
-void Condense(uint3 dispatchId : SV_DispatchThreadID, uint3 groupId : SV_GroupId) {
-    if (dispatchId.y >= _ImageWidth * _ImageHeight) {
-        return;
-    }
-    uint2 pixelPosition = uint2(dispatchId.y, dispatchId.y / _ImageWidth);
-    pixelPosition.x -= pixelPosition.y * _ImageWidth;
-    const uint pixelVoronoiId = floor(_VoronoiDiagram[pixelPosition].r * _NumRegions + 0.5);
-    const bool isActive = (pixelVoronoiId == _Base + dispatchId.x);
-    const uint count = WaveActiveCountBits(isActive);
-    if (!isActive) {
-        if (WaveIsFirstLane() && count == 0) {
-            _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(0, 0, 0);
+void Condense(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupId) {
+    if (id.y < _ImageWidth * _ImageHeight) {
+        uint2 pixelPosition = uint2(id.y, id.y / _ImageWidth);
+        pixelPosition.x -= pixelPosition.y * _ImageWidth;
+        const uint pixelVoronoiId = floor(_VoronoiDiagram[pixelPosition].r * _NumRegions + 0.5);
+        const bool isActive = (pixelVoronoiId == _Base + id.x);
+        const uint count = WaveActiveCountBits(isActive);
+        if (!isActive) {
+            if (WaveIsFirstLane() && count == 0) {
+                _WaveBuffer[(id.x * _NumGroupsPerDispatch) + gid.y] = float3(0, 0, 0);
+            }
+            return;
         }
-        return;
-    }
-    float2 centroidPos = float2(0, 0);
-    float2 worldPos = PixelToWorldCoord(pixelPosition);
-    centroidPos.x = WaveActiveSum(worldPos.x);
-    centroidPos.y = WaveActiveSum(worldPos.y);
-    if (WaveIsFirstLane()) {
-        _WaveBuffer[(dispatchId.x * _NumWavesPerDispatch) + groupId.y] = float3(centroidPos, count);
+        float2 centroidPos = float2(0, 0);
+        float2 worldPos = PixelToWorldCoord(pixelPosition);
+        centroidPos.x = WaveActiveSum(worldPos.x);
+        centroidPos.y = WaveActiveSum(worldPos.y);
+        if (WaveIsFirstLane()) {
+            _WaveBuffer[(id.x * _NumGroupsPerDispatch) + gid.y] = float3(centroidPos, count);
+        }
     }
 }
 
 // https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf
 [numthreads(1, 1024, 1)]
-void Reduce(uint3 id : SV_DispatchThreadID, uint3 threadId : SV_GroupThreadID) {
-    uint index = _Offset * 2 * id.y;
-    if (index >= _NumWavesPerDispatch || index + _Offset >= _NumWavesPerDispatch) {
-        return;
+void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadId, uint3 gid : SV_GroupID) {
+    if (id.y < _Remaining) {
+        data[tid.y] = _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (id.y * _Stride)];
+    } else {
+        data[tid.y] = float3(0, 0, 0);
     }
-    int base = id.x * _NumWavesPerDispatch;
-    if (_Offset * 2 < _NumWavesPerDispatch) {
-        _WaveBuffer[base + index] += _WaveBuffer[base + index + _Offset];
-    } else if (WaveIsFirstLane()) {
-        float3 data = _WaveBuffer[base] + _WaveBuffer[base + _Offset];
-        _PositionMatrixBuffer[(_Base + id.x)]._m03_m13 = data.xy / data.z;
+    AllMemoryBarrierWithGroupSync();
+    
+    for (int s = 512; s > 0; s >>= 1)
+    {
+        if (tid.y < s)
+        {
+            data[tid.y] += data[tid.y + s];
+        }
+        AllMemoryBarrierWithGroupSync();
+    }
+
+    if (tid.y == 0) {
+        if (_Stride * 1024 < _NumGroupsPerDispatch) {
+            _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 1024)] = data[0];
+        } else {
+            float3 centroidData = data[0];
+            _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;
+        }
     }
 }

@@ -45,7 +45,8 @@ namespace CentroidVisualizer {
         }
 
         private void AssignColors() {
-            for(int i = 0; i < numPoints; i++) {
+            _colors[0].y = _colors[0].z = 1f;
+            for(int i = 1; i < numPoints; i++) {
                 _colors[i].x = i / (float)numPoints;
                 _colors[i].y = Random.Range(0f, 1f);
                 _colors[i].z = Random.Range(0f, 1f);

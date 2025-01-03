@@ -31,8 +31,9 @@ namespace CentroidVisualizer {
                             heightId = Shader.PropertyToID("_Height"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
                             numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch"),
-                            offsetId = Shader.PropertyToID("_Offset"),
-                            baseId = Shader.PropertyToID("_Base");
+                            strideId = Shader.PropertyToID("_Stride"),
+                            baseId = Shader.PropertyToID("_Base"),
+                            remainingId = Shader.PropertyToID("_Remaining");
 
         int condenseKernelId, reduceKernelId;
 
@@ -78,7 +79,7 @@ namespace CentroidVisualizer {
             colorBuffer = null;
             waveBuffer?.Release();
             waveBuffer = null;
-            rt?.Release();
+            rt.Release();
             rt = null;
         }
 
@@ -97,7 +98,8 @@ namespace CentroidVisualizer {
 
         public void CalculateCentroid() {
             for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 1024) {
-                int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
+                //int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
+                int regionCount = 1; // Trying to test centroid for just one region.
                 
                 // Condense
                 centroidCalculator.SetInt(baseId, baseOffset);
@@ -105,11 +107,12 @@ namespace CentroidVisualizer {
 
                 // Reduce
                 int remaining = numGroupsPerDispatch;
-                for (int offset = 1; offset < numGroupsPerDispatch; offset *= 2) {
-                    int numBatches = Mathf.CeilToInt(remaining / 2048f);
-                    centroidCalculator.SetInt(offsetId, offset);
+                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 1024) {
+                    int numBatches = Mathf.CeilToInt(remaining / 1024f);
+                    centroidCalculator.SetInt(strideId, stride);
+                    centroidCalculator.SetInt(remainingId, remaining);
                     centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
-                    remaining = Mathf.CeilToInt(remaining / 2f);
+                    remaining = Mathf.CeilToInt(remaining / 1024f);
                 }
             }
         }
