@@ -64,7 +64,7 @@ namespace CentroidVisualizer {
                 data = new DataManager(numRegions, cam);
             }
             rt = CreateRenderTexture();
-            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 32f);
+            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 64f);
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
@@ -98,21 +98,21 @@ namespace CentroidVisualizer {
 
         public void CalculateCentroid() {
             for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 1024) {
-                //int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
-                int regionCount = 1; // Trying to test centroid for just one region.
+                // int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
+                int regionCount = 1;
                 
                 // Condense
                 centroidCalculator.SetInt(baseId, baseOffset);
-                centroidCalculator.Dispatch(condenseKernelId, regionCount, numGroupsPerDispatch, 1);
+                centroidCalculator.Dispatch(condenseKernelId, regionCount, rt.width / 8, rt.height / 8);
 
                 // Reduce
                 int remaining = numGroupsPerDispatch;
-                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 1024) {
-                    int numBatches = Mathf.CeilToInt(remaining / 1024f);
+                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 128) {
+                    int numBatches = Mathf.CeilToInt(remaining / 128f);
                     centroidCalculator.SetInt(strideId, stride);
                     centroidCalculator.SetInt(remainingId, remaining);
                     centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
-                    remaining = Mathf.CeilToInt(remaining / 1024f);
+                    remaining = Mathf.CeilToInt(remaining / 128f);
                 }
             }
         }
