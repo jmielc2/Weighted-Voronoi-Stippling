@@ -10,7 +10,7 @@ uniform uint _ImageWidth, _ImageHeight;
 uniform float _Width, _Height;
 uniform uint _NumGroupsPerDispatch, _Stride, _Base, _Remaining;
 
-groupshared float3 condense[32];
+groupshared float3 condense[64];
 groupshared float3 reduce[128];
 
 float2 PixelToWorldCoord(float2 pixel) {
@@ -24,7 +24,8 @@ float2 PixelToWorldCoord(float2 pixel) {
 [numthreads(1, 8, 8)]
 void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
     // Initialize group shared memory to 0
-    condense[tid.y] = float3(0, 0, 0);
+    uint index = tid.z * 8 + tid.y;
+    condense[index] = float3(0, 0, 0);
     GroupMemoryBarrierWithGroupSync();
     
     if (id.y < _ImageWidth && id.z < _ImageHeight) {
@@ -35,35 +36,34 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
         // then add its position to groupshared memory
         if (pixelVoronoiId == _Base + id.x) {
             float2 worldPos = PixelToWorldCoord(id.yz);
-            condense[tid.y] = float3(worldPos, 1);
+            condense[index] = float3(worldPos, 1);
         }
     }
     GroupMemoryBarrierWithGroupSync();
 
     // Reduce
-    for (uint i = 16; i > 0; i >>= 1) {
-        if (tid.y < i) {
-            condense[tid.y] += condense[tid.y + i];
+    for (uint i = 32; i > 0; i >>= 1) {
+        if (index < i) {
+            condense[index] += condense[index + i];
         }
         GroupMemoryBarrierWithGroupSync();
     }
 
     // Write reduced result to global memory
-    if (tid.y == 0) {
-        _WaveBuffer[(id.x * _NumGroupsPerDispatch) + gid.y] = condense[0];
+    if (index == 0) {
+        const uint gindex = gid.z * (_ImageWidth / 8) + gid.y;
+        _WaveBuffer[(id.x * _NumGroupsPerDispatch) + gindex] = condense[0];
     }
 }
 
 // https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf
 [numthreads(1, 128, 1)]
 void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
-    // Initialize groupshared memory to 0
-    reduce[tid.y] = float3(0, 0, 0);
-    GroupMemoryBarrierWithGroupSync();
-    
     // If we are within bounds of remaining values, add it to shared memory
     if (id.y < _Remaining) {
         reduce[tid.y] = _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (id.y * _Stride)];
+    } else {
+        reduce[tid.y] = float3(0, 0, 0);
     }
     GroupMemoryBarrierWithGroupSync();
     

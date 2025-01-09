@@ -30,7 +30,7 @@ namespace CentroidVisualizer {
                             widthId = Shader.PropertyToID("_Width"),
                             heightId = Shader.PropertyToID("_Height"),
                             waveBufferId = Shader.PropertyToID("_WaveBuffer"),
-                            numWavesPerDispatchId = Shader.PropertyToID("_NumWavesPerDispatch"),
+                            numGroupsPerDispatchId = Shader.PropertyToID("_NumGroupsPerDispatch"),
                             strideId = Shader.PropertyToID("_Stride"),
                             baseId = Shader.PropertyToID("_Base"),
                             remainingId = Shader.PropertyToID("_Remaining");
@@ -98,8 +98,8 @@ namespace CentroidVisualizer {
 
         public void CalculateCentroid() {
             for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 1024) {
-                // int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
-                int regionCount = 1;
+                int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
+                // int regionCount = 2;
                 
                 // Condense
                 centroidCalculator.SetInt(baseId, baseOffset);
@@ -150,7 +150,7 @@ namespace CentroidVisualizer {
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, rt.width);
             centroidCalculator.SetInt(imageHeightId, rt.height);
-            centroidCalculator.SetInt(numWavesPerDispatchId, numGroupsPerDispatch);
+            centroidCalculator.SetInt(numGroupsPerDispatchId, numGroupsPerDispatch);
             centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
 
