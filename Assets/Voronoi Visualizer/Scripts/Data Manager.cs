@@ -67,7 +67,7 @@ namespace VoronoiVisualizer {
             int[] triangles = new int[numSlices * 3];
             vertices[0] = Vector3.zero;
             float angle = 0f;
-            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.025f;
+            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,

@@ -11,7 +11,7 @@ uniform float _Width, _Height;
 uniform uint _NumGroupsPerDispatch, _Stride, _Base, _Remaining;
 
 groupshared float3 condense[64];
-groupshared float3 reduce[128];
+groupshared float3 reduce[256];
 
 float2 PixelToWorldCoord(float2 pixel) {
     return float2(
@@ -59,7 +59,7 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
 }
 
 // https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf
-[numthreads(1, 128, 1)]
+[numthreads(1, 256, 1)]
 void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
     // If we are within bounds of remaining values, add it to shared memory
     if (id.y < _Remaining) {
@@ -71,7 +71,7 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 
     
     // Reduce
     [unroll]
-    for (uint s = 64; s > 0; s >>= 1) {
+    for (uint s = 128; s > 0; s >>= 1) {
         if (tid.y < s) {
             reduce[tid.y] += reduce[tid.y + s];
         }
@@ -80,9 +80,9 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 
 
     if (tid.y == 0) {
         float3 centroidData = reduce[0];
-        if (_Stride * 128 < _NumGroupsPerDispatch) {
+        if (_Stride * 256 < _NumGroupsPerDispatch) {
             // If there are remaining iterations, write back to global memory for next iteration
-            _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 128)] = centroidData;
+            _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = centroidData;
         } else if (centroidData.z > 0) {
             // If this is the last iteration, update the position matrix of voronoi to the centroid
             _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;

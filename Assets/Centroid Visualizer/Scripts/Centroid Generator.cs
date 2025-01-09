@@ -5,7 +5,7 @@ namespace CentroidVisualizer {
     public class CentroidGenerator : MonoBehaviour {
         [SerializeField]
         Material material;
-        [SerializeField, Range(1, 20000)]
+        [SerializeField, Range(1, 1024)]
         int numRegions = 100;
         [SerializeField]
         ComputeShader centroidCalculator;
@@ -106,12 +106,12 @@ namespace CentroidVisualizer {
 
                 // Reduce
                 int remaining = numGroupsPerDispatch;
-                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 128) {
-                    int numBatches = Mathf.CeilToInt(remaining / 128f);
+                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 256) {
+                    int numBatches = Mathf.CeilToInt(remaining / 256f);
                     centroidCalculator.SetInt(strideId, stride);
                     centroidCalculator.SetInt(remainingId, remaining);
                     centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
-                    remaining = Mathf.CeilToInt(remaining / 128f);
+                    remaining = Mathf.CeilToInt(remaining / 256f);
                 }
             }
         }
@@ -182,7 +182,9 @@ namespace CentroidVisualizer {
         }
 
         RenderTexture CreateRenderTexture() {
-            var descriptor = new RenderTextureDescriptor(960, 540, RenderTextureFormat.ARGBFloat) {
+            int width = cam.pixelWidth;
+            int height = cam.pixelHeight;
+            var descriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBFloat) {
                 depthBufferBits = 32,
                 useMipMap = false,
                 enableRandomWrite = true

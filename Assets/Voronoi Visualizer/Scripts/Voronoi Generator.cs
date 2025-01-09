@@ -6,7 +6,7 @@ namespace VoronoiVisualizer {
     public class VoronoiGenerator : MonoBehaviour {
         [SerializeField]
         protected Material material;
-        [SerializeField, Range(1, 20000)]
+        [SerializeField, Range(1, 1024)]
         protected int numRegions = 100;
 
         // Private Member Variables
