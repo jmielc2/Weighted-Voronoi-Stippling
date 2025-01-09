@@ -64,7 +64,7 @@ namespace CentroidVisualizer {
                 data = new DataManager(numRegions, cam);
             }
             rt = CreateRenderTexture();
-            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 64f);
+            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 256f);
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
@@ -97,22 +97,21 @@ namespace CentroidVisualizer {
         }
 
         public void CalculateCentroid() {
-            for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 1024) {
-                int regionCount = (baseOffset + 1024 > numRegions)? numRegions - baseOffset : 1024;
-                // int regionCount = 2;
+            for (int baseOffset = 0; baseOffset < numRegions; baseOffset += 2048) {
+                int regionCount = (baseOffset + 2048 > numRegions)? numRegions - baseOffset : 2048;
                 
                 // Condense
                 centroidCalculator.SetInt(baseId, baseOffset);
-                centroidCalculator.Dispatch(condenseKernelId, regionCount, rt.width / 8, rt.height / 8);
+                centroidCalculator.Dispatch(condenseKernelId, regionCount, rt.width / 16, rt.height / 16);
 
                 // Reduce
                 int remaining = numGroupsPerDispatch;
-                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 128) {
-                    int numBatches = Mathf.CeilToInt(remaining / 128f);
+                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 256) {
+                    int numBatches = Mathf.CeilToInt(remaining / 256f);
                     centroidCalculator.SetInt(strideId, stride);
                     centroidCalculator.SetInt(remainingId, remaining);
                     centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
-                    remaining = Mathf.CeilToInt(remaining / 128f);
+                    remaining = Mathf.CeilToInt(remaining / 256f);
                 }
             }
         }
@@ -135,7 +134,7 @@ namespace CentroidVisualizer {
             argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float) * 3);
-            waveBuffer = new ComputeBuffer(1024 * numGroupsPerDispatch, sizeof(float) * 3);
+            waveBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
         }
 
         void LoadBuffers() {
