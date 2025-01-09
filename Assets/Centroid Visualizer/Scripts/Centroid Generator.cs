@@ -182,7 +182,7 @@ namespace CentroidVisualizer {
         }
 
         RenderTexture CreateRenderTexture() {
-            var descriptor = new RenderTextureDescriptor(cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.ARGBFloat) {
+            var descriptor = new RenderTextureDescriptor(960, 540, RenderTextureFormat.ARGBFloat) {
                 depthBufferBits = 32,
                 useMipMap = false,
                 enableRandomWrite = true
