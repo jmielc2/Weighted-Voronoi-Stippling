@@ -64,7 +64,7 @@ namespace CentroidVisualizer {
                 data = new DataManager(numRegions, cam);
             }
             rt = CreateRenderTexture();
-            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 256f);
+            numGroupsPerDispatch = Mathf.CeilToInt(rt.width * rt.height / 64f);
             CreateBuffers();
             LoadBuffers();
             ConfigureRenderPass();
@@ -102,16 +102,16 @@ namespace CentroidVisualizer {
                 
                 // Condense
                 centroidCalculator.SetInt(baseId, baseOffset);
-                centroidCalculator.Dispatch(condenseKernelId, regionCount, rt.width / 16, rt.height / 16);
+                centroidCalculator.Dispatch(condenseKernelId, regionCount, rt.width / 8, rt.height / 8);
 
                 // Reduce
                 int remaining = numGroupsPerDispatch;
-                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 256) {
-                    int numBatches = Mathf.CeilToInt(remaining / 256f);
+                for (int stride = 1; stride < numGroupsPerDispatch; stride *= 128) {
+                    int numBatches = Mathf.CeilToInt(remaining / 128f);
                     centroidCalculator.SetInt(strideId, stride);
                     centroidCalculator.SetInt(remainingId, remaining);
                     centroidCalculator.Dispatch(reduceKernelId, regionCount, numBatches, 1);
-                    remaining = Mathf.CeilToInt(remaining / 256f);
+                    remaining = Mathf.CeilToInt(remaining / 128f);
                 }
             }
         }
