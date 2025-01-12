@@ -1,12 +1,7 @@
-Shader "Fast Stippler/Point Shader" {
-    Properties {
-        _Color ("Color", Color) = (0, 0, 0, 1)
-        _Scale ("Scale", float) = 0.5
-    }
-
+Shader "Fast Stippler/Voronoi Shader" {
     SubShader {
-        Zwrite Off
         Cull Off
+        Zwrite On
 
         Pass {
             CGPROGRAM
@@ -23,24 +18,25 @@ Shader "Fast Stippler/Point Shader" {
 
             struct v2f {
                 float4 vertex : SV_POSITION;
+                uint instanceID : SV_InstanceID;
             };
 
-            StructuredBuffer<float4x4> _PositionMatrixBuffer;
-            float4 _Color;
-            float _Scale;
 
-            v2f vert (appdata v, uint instanceID : SV_InstanceID) {
+            StructuredBuffer<float4x4> _PositionMatrixBuffer;
+            StructuredBuffer<float> _ColorBuffer;
+
+            v2f vert(appdata v, uint instanceID : SV_InstanceID) {
                 v2f o;
-                float4x4 transform = _PositionMatrixBuffer[instanceID];
-                transform._m00_m11_m22 = _Scale;
-                o.vertex = mul(transform, v.vertex);
+                o.instanceID = instanceID;
+                o.vertex = mul(_PositionMatrixBuffer[instanceID], v.vertex);
                 o.vertex = UnityObjectToClipPos(o.vertex);
                 return o;
             }
 
-            float4 frag (v2f i) : SV_Target {
-                return _Color;
+            float frag(v2f i) : SV_Target {
+                return _ColorBuffer[i.instanceID];
             }
+
             ENDCG
         }
     }
