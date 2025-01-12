@@ -4,6 +4,8 @@ using UnityEngine.Rendering;
 namespace FastStippler {
     public class FastStippler : MonoBehaviour {
         [SerializeField]
+        Texture2D sourceImage;
+        [SerializeField]
         Material material, pointMaterial;
         [SerializeField, Range(1024, 10000)]
         int numRegions = 100;
@@ -26,6 +28,9 @@ namespace FastStippler {
         readonly static int positionBufferId = Shader.PropertyToID("_PositionMatrixBuffer"),
                             colorBufferId = Shader.PropertyToID("_ColorBuffer"),
                             voronoiDiagramId = Shader.PropertyToID("_VoronoiDiagram"),
+                            sourceImageId = Shader.PropertyToID("_SourceImage"),
+                            sourceImageWidthId = Shader.PropertyToID("_SourceImageWidth"),
+                            sourceImageHeightId = Shader.PropertyToID("_SourceImageHeight"),
                             numRegionsId = Shader.PropertyToID("_NumRegions"),
                             imageWidthId = Shader.PropertyToID("_ImageWidth"),
                             imageHeightId = Shader.PropertyToID("_ImageHeight"),
@@ -63,7 +68,7 @@ namespace FastStippler {
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, cam);
             }
-            voronoi = CreateRenderTexture(cam.pixelWidth / 2, cam.pixelHeight / 2);
+            voronoi = CreateRenderTexture(cam.pixelWidth, cam.pixelHeight);
             RenderTextureDescriptor descriptor = new (cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.Default);
             stipple = CreateRenderTexture(descriptor);
             numGroupsPerDispatch = Mathf.CeilToInt(voronoi.width * voronoi.height / 64f);
@@ -174,12 +179,15 @@ namespace FastStippler {
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, voronoi.width);
             centroidCalculator.SetInt(imageHeightId, voronoi.height);
+            centroidCalculator.SetInt(sourceImageWidthId, sourceImage.width);
+            centroidCalculator.SetInt(sourceImageHeightId, sourceImage.height);
             centroidCalculator.SetInt(numGroupsPerDispatchId, numGroupsPerDispatch);
             centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
 
             // Set compute shader data needed to gather voronoi data
             centroidCalculator.SetTexture(condenseKernelId, voronoiDiagramId, voronoi);
+            centroidCalculator.SetTexture(condenseKernelId, sourceImageId, sourceImage);
             centroidCalculator.SetBuffer(condenseKernelId, waveBufferId, waveBuffer);
 
             // Set compute shader data needed to calculate centroids

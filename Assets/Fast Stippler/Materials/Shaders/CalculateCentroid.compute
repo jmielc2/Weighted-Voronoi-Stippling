@@ -2,22 +2,32 @@
 #pragma kernel Reduce
 
 Texture2D<float> _VoronoiDiagram;
+Texture2D<float4> _SourceImage;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 RWStructuredBuffer<float3> _WaveBuffer;
 
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
+uniform uint _SourceImageWidth, _SourceImageHeight;
 uniform float _Width, _Height;
 uniform uint _NumGroupsPerDispatch, _Stride, _Base, _Remaining;
 
 groupshared float3 condense[64];
 groupshared float3 reduce[256];
 
-float2 PixelToWorldCoord(float2 pixel) {
+float2 PixelToWorldCoord(uint2 pixelPos) {
     return float2(
-        (((pixel.x + 0.5) / _ImageWidth) - 0.5) * _Width,
-        (((pixel.y + 0.5) / _ImageHeight) - 0.5) * _Height
+        (((pixelPos.x + 0.5) / _ImageWidth) - 0.5) * _Width,
+        (((pixelPos.y + 0.5) / _ImageHeight) - 0.5) * _Height
     );
+}
+
+float Luminance(float3 pixel) {
+    return 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
+}
+
+float3 GetSourceImagePixel(uint2 pixelPos) {
+    return _SourceImage[pixelPos].rgb;
 }
 
 // Centroid Algorithm
@@ -31,8 +41,9 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
         // If voronoi Id of current pixel matches the voronoi Id we're processing (id.x),
         // then add its position to groupshared memory
         if (pixelVoronoiId == _Base + id.x) {
+            float weight = 1.0 - Luminance(GetSourceImagePixel(id.yz));
             float2 worldPos = PixelToWorldCoord(id.yz);
-            condense[index] = float3(worldPos, 1);
+            condense[index] = float3(worldPos * weight, weight);
         } else {
             condense[index] = float3(0, 0, 0);
         }
