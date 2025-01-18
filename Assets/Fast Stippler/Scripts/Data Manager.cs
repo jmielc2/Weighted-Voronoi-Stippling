@@ -9,16 +9,16 @@ namespace FastStippler {
         static Mesh _coneMesh = null;
         static Mesh _pointMesh = null;
 
-        public DataManager(int numRegions, Camera cam) {
+        public DataManager(int numRegions, Texture2D image, float camAspect) {
             if (_coneMesh == null) {
-                CreateConeMesh(cam);
+                CreateConeMesh(image);
                 CreatePointMesh();
             }
             numPoints = numRegions;
             _colors = new float[numPoints];
             _coneMatrices = new Matrix4x4[numPoints];
             AssignColors();
-            GenerateRandomPoints(cam);
+            GenerateRandomPoints(image, camAspect);
         }
 
         public int NumPoints {
@@ -41,12 +41,21 @@ namespace FastStippler {
             get {  return _pointMesh; }
         }
 
-        private void GenerateRandomPoints(Camera cam) {
+        private void GenerateRandomPoints(Texture2D image, float camAspect) {
             Vector3 point = Vector3.zero;
+            float aspect = image.width / image.height;
+            float height, width;
+            if (aspect < camAspect) {
+                height = 1f;
+                width = aspect;
+            } else {
+                height = (1f / aspect) * camAspect;
+                width = camAspect;
+            }
             for(int i = 0; i < numPoints; i++) {
                 // Calculate Cone Matrix
-                point.x = Random.Range(-1f, 1f) * cam.aspect;
-                point.y = Random.Range(-1f, 1f);
+                point.x = Random.Range(-1f, 1f) * width;
+                point.y = Random.Range(-1f, 1f) * height;
                 _coneMatrices[i] = Matrix4x4.TRS(point, Quaternion.identity, Vector3.one);
             }
         }
@@ -57,12 +66,12 @@ namespace FastStippler {
             }
         }
 
-        private static void CreateConeMesh(Camera cam) {
+        private static void CreateConeMesh(Texture2D image) {
             _coneMesh = new Mesh {
                 subMeshCount = 1
             };
             // Calculate Minimum Number of Cone Slices
-            float radius = Mathf.Sqrt(cam.pixelWidth * cam.pixelWidth + cam.pixelHeight * cam.pixelHeight);
+            float radius = Mathf.Sqrt(image.width * image.width + image.height * image.height);
             float maxAngle = 2f * Mathf.Acos((radius - 1f) / radius) * 2f;
             int numSlices = Mathf.CeilToInt((2f * Mathf.PI) / maxAngle);
 
@@ -71,7 +80,8 @@ namespace FastStippler {
             int[] triangles = new int[numSlices * 3];
             vertices[0] = Vector3.zero;
             float angle = 0f;
-            radius = Mathf.Sqrt(cam.aspect * cam.aspect + 1) * 2f * 0.1f;
+            float aspect = image.width / image.height;
+            radius = Mathf.Sqrt(aspect * aspect + 1) * 2f * 0.1f;
             for (int i = 1; i < numSlices + 1; i++) {
                 vertices[i] = new Vector3(
                     Mathf.Cos(angle) * radius,

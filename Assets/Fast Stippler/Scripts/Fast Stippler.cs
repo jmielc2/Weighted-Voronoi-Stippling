@@ -16,7 +16,7 @@ namespace FastStippler {
         Camera cam;
         DataManager data;
         GraphicsBuffer voronoiArgsBuffer, stippleArgsBuffer;
-        ComputeBuffer positionBuffer, colorBuffer, waveBuffer;
+        ComputeBuffer positionBuffer, colorBuffer, weightedBuffer, unweightedBuffer;
         Bounds renderBounds;
         RenderTexture voronoi = null;
         RenderTexture stipple = null;
@@ -36,7 +36,8 @@ namespace FastStippler {
                             imageHeightId = Shader.PropertyToID("_ImageHeight"),
                             widthId = Shader.PropertyToID("_Width"),
                             heightId = Shader.PropertyToID("_Height"),
-                            waveBufferId = Shader.PropertyToID("_WaveBuffer"),
+                            weightedBufferId = Shader.PropertyToID("_WeightedBuffer"),
+                            unweightedBufferId = Shader.PropertyToID("_UnweightedBuffer"),
                             numGroupsPerDispatchId = Shader.PropertyToID("_NumGroupsPerDispatch"),
                             strideId = Shader.PropertyToID("_Stride"),
                             baseId = Shader.PropertyToID("_Base"),
@@ -66,9 +67,9 @@ namespace FastStippler {
 
         void OnEnable() {
             if (data == null || data.NumPoints != numRegions) {
-                data = new DataManager(numRegions, cam);
+                data = new DataManager(numRegions, sourceImage, cam.aspect);
             }
-            voronoi = CreateRenderTexture(cam.pixelWidth, cam.pixelHeight);
+            voronoi = CreateRenderTexture(sourceImage.width, sourceImage.height);
             RenderTextureDescriptor descriptor = new (cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.Default);
             stipple = CreateRenderTexture(descriptor);
             numGroupsPerDispatch = Mathf.CeilToInt(voronoi.width * voronoi.height / 64f);
@@ -86,8 +87,10 @@ namespace FastStippler {
             positionBuffer = null;
             colorBuffer?.Release();
             colorBuffer = null;
-            waveBuffer?.Release();
-            waveBuffer = null;
+            weightedBuffer?.Release();
+            weightedBuffer = null;
+            unweightedBuffer?.Release();
+            unweightedBuffer = null;
             voronoi.Release();
             voronoi = null;
             stipple.Release();
@@ -163,7 +166,8 @@ namespace FastStippler {
             stippleArgsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float));
-            waveBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
+            weightedBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
+            unweightedBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
         }
 
         void LoadBuffers() {
@@ -176,22 +180,25 @@ namespace FastStippler {
             colorBuffer.SetData(data.Colors);
 
             // Set shared compute shader data
+            float aspect = voronoi.width / voronoi.height;
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, voronoi.width);
             centroidCalculator.SetInt(imageHeightId, voronoi.height);
             centroidCalculator.SetInt(sourceImageWidthId, sourceImage.width);
             centroidCalculator.SetInt(sourceImageHeightId, sourceImage.height);
             centroidCalculator.SetInt(numGroupsPerDispatchId, numGroupsPerDispatch);
-            centroidCalculator.SetFloat(widthId, cam.aspect * 2f);
+            centroidCalculator.SetFloat(widthId, aspect * 2f);
             centroidCalculator.SetFloat(heightId, 2f);
 
             // Set compute shader data needed to gather voronoi data
             centroidCalculator.SetTexture(condenseKernelId, voronoiDiagramId, voronoi);
             centroidCalculator.SetTexture(condenseKernelId, sourceImageId, sourceImage);
-            centroidCalculator.SetBuffer(condenseKernelId, waveBufferId, waveBuffer);
+            centroidCalculator.SetBuffer(condenseKernelId, weightedBufferId, weightedBuffer);
+            centroidCalculator.SetBuffer(condenseKernelId, unweightedBufferId, unweightedBuffer);
 
             // Set compute shader data needed to calculate centroids
-            centroidCalculator.SetBuffer(reduceKernelId, waveBufferId, waveBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, weightedBufferId, weightedBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, unweightedBufferId, unweightedBuffer);
             centroidCalculator.SetBuffer(reduceKernelId, colorBufferId, colorBuffer);
             centroidCalculator.SetBuffer(reduceKernelId, positionBufferId, positionBuffer);
         }

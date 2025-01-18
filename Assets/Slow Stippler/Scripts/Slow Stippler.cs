@@ -17,7 +17,6 @@ namespace SlowStippler {
         Camera cam;
         float width, height;
         Voronator voronator;
-        float minWeight;
 
         [SerializeField]
         Texture2D stippleImage;
@@ -42,7 +41,6 @@ namespace SlowStippler {
                 return;
             }
             pixels = stippleImage.GetPixels();
-            CalcMinWeight();
             float imageAspect = stippleImage.width / (float)stippleImage.height;
             if (imageAspect > cam.aspect) {
                 width = cam.aspect;
@@ -70,19 +68,6 @@ namespace SlowStippler {
                 }                
                 CalcDelauney();
             }
-        }
-
-        void CalcMinWeight() {
-            minWeight = 0f;
-            for (int x = 0; x < stippleImage.width; x++) {
-                float rowWeight = 0f;
-                for (int y = 0; y < stippleImage.height; y++) {
-                    rowWeight += CalcPixelWeight(x, y);
-                }
-                rowWeight /= stippleImage.width;
-                minWeight += rowWeight;
-            }
-            minWeight /= 2f;
         }
 
         float CalcPixelWeight(int x, int y) {

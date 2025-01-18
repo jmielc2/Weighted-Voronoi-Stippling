@@ -4,7 +4,8 @@
 Texture2D<float> _VoronoiDiagram;
 Texture2D<float4> _SourceImage;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
-RWStructuredBuffer<float3> _WaveBuffer;
+RWStructuredBuffer<float3> _WeightedBuffer;
+RWStructuredBuffer<float3> _UnweightedBuffer;
 
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
@@ -12,8 +13,11 @@ uniform uint _SourceImageWidth, _SourceImageHeight;
 uniform float _Width, _Height;
 uniform uint _NumGroupsPerDispatch, _Stride, _Base, _Remaining;
 
-groupshared float3 condense[64];
-groupshared float3 reduce[256];
+groupshared float3 weightedCentroid[64];
+groupshared float3 unweightedCentroid[64];
+
+groupshared float3 weightedReduce[256];
+groupshared float3 unweightedReduce[256];
 
 float2 PixelToWorldCoord(uint2 pixelPos) {
     return float2(
@@ -23,11 +27,7 @@ float2 PixelToWorldCoord(uint2 pixelPos) {
 }
 
 float Luminance(float3 pixel) {
-    return 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
-}
-
-float3 GetSourceImagePixel(uint2 pixelPos) {
-    return _SourceImage[pixelPos].rgb;
+    return (0.299 * pixel.r) + (0.587 * pixel.g) + (0.114 * pixel.b);
 }
 
 // Centroid Algorithm
@@ -40,15 +40,18 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
         
         // If voronoi Id of current pixel matches the voronoi Id we're processing (id.x),
         // then add its position to groupshared memory
+        float2 worldPos = PixelToWorldCoord(id.yz);
         if (pixelVoronoiId == _Base + id.x) {
-            float weight = 1.0 - Luminance(GetSourceImagePixel(id.yz));
-            float2 worldPos = PixelToWorldCoord(id.yz);
-            condense[index] = float3(worldPos * weight, weight);
+            float weight = 1.0 - Luminance(_SourceImage[id.yz].rgb);
+            weightedCentroid[index] = float3(worldPos * weight, weight);
+            unweightedCentroid[index] = float3(worldPos, 1);
         } else {
-            condense[index] = float3(0, 0, 0);
+            weightedCentroid[index] = float3(0, 0, 0);
+            unweightedCentroid[index] = float3(0, 0, 0);
         }
     } else {
-        condense[index] = float3(0, 0, 0);
+        weightedCentroid[index] = float3(0, 0, 0);
+        unweightedCentroid[index] = float3(0, 0, 0);
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -56,7 +59,8 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
     [unroll]
     for (uint i = 32; i > 0; i >>= 1) {
         if (index < i) {
-            condense[index] += condense[index + i];
+            weightedCentroid[index] += weightedCentroid[index + i];
+            unweightedCentroid[index] += unweightedCentroid[index + i];
         }
         GroupMemoryBarrierWithGroupSync();
     }
@@ -64,7 +68,8 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
     // Write reduced result to global memory
     if (index == 0) {
         const uint gindex = gid.z * (_ImageWidth / 8) + gid.y;
-        _WaveBuffer[(id.x * _NumGroupsPerDispatch) + gindex] = condense[0];
+        _WeightedBuffer[(id.x * _NumGroupsPerDispatch) + gindex] = weightedCentroid[0];
+        _UnweightedBuffer[(id.x * _NumGroupsPerDispatch) + gindex] = unweightedCentroid[0];
     }
 }
 
@@ -73,9 +78,11 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
 void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
     // If we are within bounds of remaining values, add it to shared memory
     if (id.y < _Remaining) {
-        reduce[tid.y] = _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (id.y * _Stride)];
+        weightedReduce[tid.y] = _WeightedBuffer[(id.x * _NumGroupsPerDispatch) + (id.y * _Stride)];
+        unweightedReduce[tid.y] = _UnweightedBuffer[(id.x * _NumGroupsPerDispatch) + (id.y * _Stride)];
     } else {
-        reduce[tid.y] = float3(0, 0, 0);
+        weightedReduce[tid.y] = float3(0, 0, 0);
+        unweightedReduce[tid.y] = float3(0, 0, 0);
     }
     GroupMemoryBarrierWithGroupSync();
     
@@ -83,19 +90,26 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 
     [unroll]
     for (uint s = 128; s > 0; s >>= 1) {
         if (tid.y < s) {
-            reduce[tid.y] += reduce[tid.y + s];
+            weightedReduce[tid.y] += weightedReduce[tid.y + s];
+            unweightedReduce[tid.y] += unweightedReduce[tid.y + s];
         }
         GroupMemoryBarrierWithGroupSync();
     }
 
     if (tid.y == 0) {
-        float3 centroidData = reduce[0];
         if (_Stride * 256 < _NumGroupsPerDispatch) {
             // If there are remaining iterations, write back to global memory for next iteration
-            _WaveBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = centroidData;
-        } else if (centroidData.z > 0) {
-            // If this is the last iteration, update the position matrix of voronoi to the centroid
-            _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;
+            _WeightedBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = weightedReduce[0];
+            _UnweightedBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = unweightedReduce[0];
+        } else {
+            float3 centroidData = float3(0, 0, 0);
+            if (weightedReduce[0].z - 0.01 > 0) {
+                float3 centroidData = weightedReduce[0];
+                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;;
+            } else if (unweightedReduce[0].z > 0) {
+                float3 centroidData = unweightedReduce[0];
+                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;
+            }
         }
     }
 }

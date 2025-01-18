@@ -218,7 +218,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d5207630d53428478fa6c3ead2efc04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stippleImage: {fileID: 2800000, guid: 19c2f1e2bb92d4e2fadb0964f953abbf, type: 3}
+  stippleImage: {fileID: 2800000, guid: 04a6121a150df4e148157452bc6f9ab1, type: 3}
   numGenerators: 10000
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
