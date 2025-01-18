@@ -1,7 +1,6 @@
 Shader "Fast Stippler/Point Shader" {
     Properties {
         _Color ("Color", Color) = (0, 0, 0, 1)
-        _Scale ("Scale", float) = 0.5
     }
 
     SubShader {
@@ -26,13 +25,13 @@ Shader "Fast Stippler/Point Shader" {
             };
 
             StructuredBuffer<float4x4> _PositionMatrixBuffer;
+            StructuredBuffer<float> _Scale;
             float4 _Color;
-            float _Scale;
 
             v2f vert (appdata v, uint instanceID : SV_InstanceID) {
                 v2f o;
                 float4x4 transform = _PositionMatrixBuffer[instanceID];
-                transform._m00_m11_m22 = _Scale;
+                transform._m00_m11_m22 = _Scale[instanceID];
                 o.vertex = mul(transform, v.vertex);
                 o.vertex = UnityObjectToClipPos(o.vertex);
                 return o;

@@ -318,7 +318,7 @@ MonoBehaviour:
   sourceImage: {fileID: 2800000, guid: 04a6121a150df4e148157452bc6f9ab1, type: 3}
   material: {fileID: 2100000, guid: 51554c2d9625ba5469523e1857409817, type: 2}
   pointMaterial: {fileID: 2100000, guid: 0e96183ad2a49ea4a8c0a2a48cde53cb, type: 2}
-  numRegions: 10000
+  numRegions: 5000
   centroidCalculator: {fileID: 7200000, guid: d825070e2d1baba489c0c53f330f64a7, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

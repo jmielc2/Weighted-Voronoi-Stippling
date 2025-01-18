@@ -6,6 +6,7 @@ Texture2D<float4> _SourceImage;
 RWStructuredBuffer<float4x4> _PositionMatrixBuffer;
 RWStructuredBuffer<float3> _WeightedBuffer;
 RWStructuredBuffer<float3> _UnweightedBuffer;
+RWStructuredBuffer<float> _Scale;
 
 uniform uint _NumRegions;
 uniform uint _ImageWidth, _ImageHeight;
@@ -102,13 +103,14 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 
             _WeightedBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = weightedReduce[0];
             _UnweightedBuffer[(id.x * _NumGroupsPerDispatch) + (gid.y * _Stride * 256)] = unweightedReduce[0];
         } else {
+            float3 uCentroid = unweightedReduce[0];
+            float3 wCentroid = weightedReduce[0];
+            _Scale[_Base + id.x] = 0.02 + ((wCentroid.z * 0.05) / (uCentroid.z + 1));
             float3 centroidData = float3(0, 0, 0);
             if (weightedReduce[0].z - 0.01 > 0) {
-                float3 centroidData = weightedReduce[0];
-                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;;
+                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = wCentroid.xy / wCentroid.z;
             } else if (unweightedReduce[0].z > 0) {
-                float3 centroidData = unweightedReduce[0];
-                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = centroidData.xy / centroidData.z;
+                _PositionMatrixBuffer[_Base + id.x]._m03_m13 = uCentroid.xy / uCentroid.z;
             }
         }
     }

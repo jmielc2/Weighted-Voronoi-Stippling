@@ -16,7 +16,7 @@ namespace FastStippler {
         Camera cam;
         DataManager data;
         GraphicsBuffer voronoiArgsBuffer, stippleArgsBuffer;
-        ComputeBuffer positionBuffer, colorBuffer, weightedBuffer, unweightedBuffer;
+        ComputeBuffer positionBuffer, colorBuffer, scaleBuffer, weightedBuffer, unweightedBuffer;
         Bounds renderBounds;
         RenderTexture voronoi = null;
         RenderTexture stipple = null;
@@ -38,6 +38,7 @@ namespace FastStippler {
                             heightId = Shader.PropertyToID("_Height"),
                             weightedBufferId = Shader.PropertyToID("_WeightedBuffer"),
                             unweightedBufferId = Shader.PropertyToID("_UnweightedBuffer"),
+                            scaleBufferId = Shader.PropertyToID("_Scale"),
                             numGroupsPerDispatchId = Shader.PropertyToID("_NumGroupsPerDispatch"),
                             strideId = Shader.PropertyToID("_Stride"),
                             baseId = Shader.PropertyToID("_Base"),
@@ -87,6 +88,8 @@ namespace FastStippler {
             positionBuffer = null;
             colorBuffer?.Release();
             colorBuffer = null;
+            scaleBuffer?.Release();
+            scaleBuffer = null;
             weightedBuffer?.Release();
             weightedBuffer = null;
             unweightedBuffer?.Release();
@@ -151,6 +154,7 @@ namespace FastStippler {
 
             // Point Material
             pointMaterial.SetBuffer(positionBufferId, positionBuffer);
+            pointMaterial.SetBuffer(scaleBufferId, scaleBuffer);
 
             stippleRp = new RenderParams() {
                 camera = cam,
@@ -166,6 +170,7 @@ namespace FastStippler {
             stippleArgsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
             positionBuffer = new ComputeBuffer(numRegions, sizeof(float) * 16);
             colorBuffer = new ComputeBuffer(numRegions, sizeof(float));
+            scaleBuffer = new ComputeBuffer(numRegions, sizeof(float));
             weightedBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
             unweightedBuffer = new ComputeBuffer(2048 * numGroupsPerDispatch, sizeof(float) * 3);
         }
@@ -200,6 +205,7 @@ namespace FastStippler {
             centroidCalculator.SetBuffer(reduceKernelId, weightedBufferId, weightedBuffer);
             centroidCalculator.SetBuffer(reduceKernelId, unweightedBufferId, unweightedBuffer);
             centroidCalculator.SetBuffer(reduceKernelId, colorBufferId, colorBuffer);
+            centroidCalculator.SetBuffer(reduceKernelId, scaleBufferId, scaleBuffer);
             centroidCalculator.SetBuffer(reduceKernelId, positionBufferId, positionBuffer);
         }
 
