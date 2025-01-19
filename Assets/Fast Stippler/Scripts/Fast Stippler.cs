@@ -70,7 +70,7 @@ namespace FastStippler {
             if (data == null || data.NumPoints != numRegions) {
                 data = new DataManager(numRegions, sourceImage, cam.aspect);
             }
-            voronoi = CreateRenderTexture(sourceImage.width, sourceImage.height);
+            voronoi = CreateRenderTexture(sourceImage.width / 2, sourceImage.height / 2);
             RenderTextureDescriptor descriptor = new (cam.pixelWidth, cam.pixelHeight, RenderTextureFormat.Default);
             stipple = CreateRenderTexture(descriptor);
             numGroupsPerDispatch = Mathf.CeilToInt(voronoi.width * voronoi.height / 64f);
@@ -185,15 +185,23 @@ namespace FastStippler {
             colorBuffer.SetData(data.Colors);
 
             // Set shared compute shader data
-            float aspect = voronoi.width / voronoi.height;
+            float aspect = voronoi.width / (float)voronoi.height;
+            float width, height;
+            if (aspect < cam.aspect) {
+                width = aspect * 2f;
+                height = 2f;
+            } else {
+                width = cam.aspect * 2;
+                height = 1f / aspect * width;
+            }
             centroidCalculator.SetInt(numRegionsId, numRegions);
             centroidCalculator.SetInt(imageWidthId, voronoi.width);
             centroidCalculator.SetInt(imageHeightId, voronoi.height);
             centroidCalculator.SetInt(sourceImageWidthId, sourceImage.width);
             centroidCalculator.SetInt(sourceImageHeightId, sourceImage.height);
             centroidCalculator.SetInt(numGroupsPerDispatchId, numGroupsPerDispatch);
-            centroidCalculator.SetFloat(widthId, aspect * 2f);
-            centroidCalculator.SetFloat(heightId, 2f);
+            centroidCalculator.SetFloat(widthId, width);
+            centroidCalculator.SetFloat(heightId, height);
 
             // Set compute shader data needed to gather voronoi data
             centroidCalculator.SetTexture(condenseKernelId, voronoiDiagramId, voronoi);

@@ -43,13 +43,13 @@ namespace FastStippler {
 
         private void GenerateRandomPoints(Texture2D image, float camAspect) {
             Vector3 point = Vector3.zero;
-            float aspect = image.width / image.height;
+            float aspect = image.width / (float)image.height;
             float height, width;
             if (aspect < camAspect) {
                 height = 1f;
                 width = aspect;
             } else {
-                height = (1f / aspect) * camAspect;
+                height = 1f / aspect * camAspect;
                 width = camAspect;
             }
             for(int i = 0; i < numPoints; i++) {

@@ -43,7 +43,7 @@ void Condense(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint
         // then add its position to groupshared memory
         float2 worldPos = PixelToWorldCoord(id.yz);
         if (pixelVoronoiId == _Base + id.x) {
-            float weight = 1.0 - Luminance(_SourceImage[id.yz].rgb);
+            float weight = 1.0 - Luminance(_SourceImage[id.yz * 2].rgb);
             weightedCentroid[index] = float3(worldPos * weight, weight);
             unweightedCentroid[index] = float3(worldPos, 1);
         } else {
@@ -105,7 +105,7 @@ void Reduce(uint3 id : SV_DispatchThreadID, uint3 tid : SV_GroupThreadID, uint3 
         } else {
             float3 uCentroid = unweightedReduce[0];
             float3 wCentroid = weightedReduce[0];
-            _Scale[_Base + id.x] = 0.02 + ((wCentroid.z * 0.05) / (uCentroid.z + 1));
+            _Scale[_Base + id.x] = 0.02 + ((wCentroid.z * 0.06) / (uCentroid.z + 1));
             float3 centroidData = float3(0, 0, 0);
             if (weightedReduce[0].z - 0.01 > 0) {
                 _PositionMatrixBuffer[_Base + id.x]._m03_m13 = wCentroid.xy / wCentroid.z;
