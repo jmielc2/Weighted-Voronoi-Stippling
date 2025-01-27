@@ -14,5 +14,6 @@ The second, GPU based implementation can be found at `Assets/GPU Stippler`. This
 
 - *Fast Computation of Generalized Voronoi Diagrams Using Graphics Hardware* by Kenneth E. Hoff III, Tim Culver, John Keyser, Ming Lin, Dinesh Manocha
 - *Weighted Voronoi Stippling* by Adrian Secord
+- *Optimizing Parallel Reduction in CUDA* - https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf
 
 Referenced papers can be found in the `Documents` folder.
