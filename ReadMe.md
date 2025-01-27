@@ -12,4 +12,5 @@ This is my implementation of the weighted voronoi stippling image post processin
 
 - *Fast Computation of Generalized Voronoi Diagrams Using Graphics Hardware* by Kenneth E. Hoff III, Tim Culver, John Keyser, Ming Lin, Dinesh Manocha
 - *Weighted Voronoi Stippling* by Adrian Secord
+
 Referenced papers can be found in the `Documents` folder.
