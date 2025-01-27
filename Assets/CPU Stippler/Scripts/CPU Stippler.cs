@@ -4,9 +4,9 @@ using VoronatorSharp;
 
 // Uses Gizmos, so only works in the editor. Make sure gizmos is enabled!
 
-namespace SlowStippler {
+namespace CPUStippler {
     [RequireComponent(typeof(Camera))]
-    public class SlowStippler : MonoBehaviour {
+    public class CPUStippler : MonoBehaviour {
         Vector2[] generators;
         List<VoronoiRegion> voronoiRegions;
         Vector3[] centroids;

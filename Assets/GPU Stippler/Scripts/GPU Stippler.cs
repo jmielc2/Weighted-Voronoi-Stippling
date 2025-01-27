@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace FastStippler {
-    public class FastStippler : MonoBehaviour {
+namespace GPUStippler {
+    public class GPUStippler : MonoBehaviour {
         [SerializeField]
         Texture2D sourceImage;
         [SerializeField]

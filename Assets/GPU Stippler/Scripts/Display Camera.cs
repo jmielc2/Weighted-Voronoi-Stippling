@@ -1,13 +1,13 @@
 using UnityEngine;
 
-namespace FastStippler {
+namespace GPUStippler {
     [RequireComponent(typeof(Camera))]
     public class DisplayCamera : MonoBehaviour {
-        FastStippler stippler;
+        GPUStippler stippler;
         bool captureFrame = false;
 
         private void Start() {
-            stippler = transform.parent.GetComponent<FastStippler>();
+            stippler = transform.parent.GetComponent<GPUStippler>();
         }
 
         private void Update() {

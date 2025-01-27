@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace FastStippler {
+namespace GPUStippler {
     public class DataManager {
         readonly float[] _colors;
         readonly Matrix4x4[] _coneMatrices;

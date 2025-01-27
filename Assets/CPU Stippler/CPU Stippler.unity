@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 1426123380}
   - component: {fileID: 1426123382}
   m_Layer: 0
-  m_Name: Slow Stippler
+  m_Name: CPU Stippler
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
